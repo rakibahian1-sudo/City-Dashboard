@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS Operations & Engineer Roll-Out Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #0f172a;
+            --card-bg: #1e293b;
+            --border-color: #334155;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-deep); color: var(--text-main); padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; }
+        h1 { font-size: 24px; font-weight: 700; color: #fff; }
+        
+        .upload-section { background: var(--card-bg); padding: 15px 20px; border-radius: 10px; border: 1px solid var(--border-color); margin-bottom: 25px; display: flex; align-items: center; gap: 15px; }
+        .upload-section input[type="file"] { color: var(--text-muted); }
+        
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .kpi-card { background: var(--card-bg); padding: 20px; border-radius: 10px; border: 1px solid var(--border-color); border-left: 4px solid var(--accent-blue); }
+        .kpi-card.withdrawn { border-left-color: var(--accent-red); }
+        .kpi-card.live { border-left-color: var(--accent-green); }
+        .kpi-card.replacement { border-left-color: var(--accent-yellow); }
+        .kpi-title { font-size: 13px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
+        .kpi-value { font-size: 28px; font-weight: 700; margin-top: 8px; color: #fff; }
+
+        .table-container { background: var(--card-bg); border-radius: 10px; border: 1px solid var(--border-color); overflow-x: auto; margin-bottom: 30px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; white-space: nowrap; }
+        th, td { padding: 12px 15px; border-bottom: 1px solid var(--border-color); }
+        th { background: #0f172a; color: var(--text-muted); font-weight: 600; position: sticky; top: 0; }
+        tr:hover { background: rgba(255,255,255,0.02); }
+        
+        .btn { background: var(--accent-blue); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+        .btn:hover { opacity: 0.9; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>POS Operations & Engineer Roll-Out Dashboard</h1>
+            <button class="btn" onclick="exportData()">Export CSV</button>
+        </header>
+
+        <!-- File Upload Section -->
+        <div class="upload-section">
+            <div>
+                <strong>Upload Daily Excel/CSV:</strong>
+                <p style="font-size: 12px; color: var(--text-muted);">Upload your daily usage file. Duplicate TID/Serial will automatically move old records to Withdrawn.</p>
+            </div>
+            <input type="file" id="csvFileInput" accept=".csv, .xlsx" onchange="handleFileUpload(event)">
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-title">1. Total Terminals</div>
+                <div class="kpi-value" id="totalCount">0</div>
+            </div>
+            <div class="kpi-card withdrawn">
+                <div class="kpi-title">2. Withdrawn</div>
+                <div class="kpi-value" id="withdrawnCount">0</div>
+            </div>
+            <div class="kpi-card live">
+                <div class="kpi-title">3. Live POS</div>
+                <div class="kpi-value" id="liveCount">0</div>
+            </div>
+            <div class="kpi-card replacement">
+                <div class="kpi-title">4. Replacement</div>
+                <div class="kpi-value" id="replacementCount">0</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">5. Pending Roll-Out</div>
+                <div class="kpi-value" id="pendingCount">0</div>
+            </div>
+        </div>
+
+        <!-- Master Data Table -->
+        <div class="table-container">
+            <table id="masterTable">
+                <thead>
+                    <tr>
+                        <th>SL.</th>
+                        <th>PURPOSE</th>
+                        <th>CONFIG DATE</th>
+                        <th>TID</th>
+                        <th>MID</th>
+                        <th>MERCHANT NAME</th>
+                        <th>LOCATION</th>
+                        <th>POS MODEL</th>
+                        <th>POS SERIAL</th>
+                        <th>SIM CARRIER</th>
+                        <th>ROLL OUT DATE</th>
+                        <th>ROLL OUT BY</th>
+                        <th>WITHDRAWN REPORT</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <!-- Dynamic Data -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let masterData = [];
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                parseCSV(text);
+            };
+            reader.readAsText(file);
+        }
+
+        function parseCSV(text) {
+            const lines = text.split('\n');
+            const headers = lines[0].split(',').map(h => h.trim());
+            
+            for(let i = 1; i < lines.length; i++) {
+                if(!lines[i].trim()) continue;
+                const cols = lines[i].split(',').map(c => c.trim());
+                
+                let rowObj = {
+                    sl: cols[0] || masterData.length + 1,
+                    purpose: cols[1] || 'NEW',
+                    configDate: cols[2] || '',
+                    tid: cols[6] || cols[3] || '',
+                    mid: cols[5] || '',
+                    merchant: cols[7] || '',
+                    location: cols[11] || '',
+                    model: cols[14] || '',
+                    serial: cols[15] || '',
+                    carrier: cols[19] || '',
+                    rollOutDate: cols[26] || '',
+                    rollOutBy: cols[27] || '',
+                    withdrawn: cols[31] || ''
+                };
+
+                // Check duplicate TID or Serial -> Move old to Withdrawn
+                let existingIndex = masterData.findIndex(item => item.tid === rowObj.tid || item.serial === rowObj.serial);
+                if(existingIndex !== -1) {
+                    masterData[existingIndex].withdrawn = 'YES (Replaced/Withdrawn)';
+                }
+
+                masterData.push(rowObj);
+            }
+            updateDashboard();
+        }
+
+        function updateDashboard() {
+            let total = masterData.length;
+            let withdrawn = masterData.filter(i => i.withdrawn && i.withdrawn !== '').length;
+            let replacement = masterData.filter(i => i.purpose.includes('REPLACE')).length;
+            let live = total - withdrawn;
+            let pending = masterData.filter(i => !i.rollOutDate).length;
+
+            document.getElementById('totalCount').innerText = total;
+            document.getElementById('withdrawnCount').innerText = withdrawn;
+            document.getElementById('liveCount').innerText = live;
+            document.getElementById('replacementCount').innerText = replacement;
+            document.getElementById('pendingCount').innerText = pending;
+
+            let tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            masterData.forEach((row, idx) => {
+                let tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${idx + 1}</td>
+                    <td>${row.purpose}</td>
+                    <td>${row.configDate}</td>
+                    <td><b>${row.tid}</b></td>
+                    <td>${row.mid}</td>
+                    <td>${row.merchant}</td>
+                    <td>${row.location}</td>
+                    <td>${row.model}</td>
+                    <td>${row.serial}</td>
+                    <td>${row.carrier}</td>
+                    <td>${row.rollOutDate}</td>
+                    <td>${row.rollOutBy}</td>
+                    <td style="color: ${row.withdrawn ? '#ef4444' : '#10b981'}">${row.withdrawn || 'ACTIVE'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function exportData() {
+            let csv = 'SL,Purpose,Config Date,TID,MID,Merchant,Location,Model,Serial,Carrier,RollOut Date,RollOut By,Withdrawn\n';
+            masterData.forEach(r => {
+                csv += `"${r.sl}","${r.purpose}","${r.configDate}","${r.tid}","${r.mid}","${r.merchant}","${r.location}","${r.model}","${r.serial}","${r.carrier}","${r.rollOutDate}","${r.rollOutBy}","${r.withdrawn}"\n`;
+            });
+            let blob = new Blob([csv], { type: 'csv' });
+            let link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'POS_Dashboard_Export.csv';
+            link.click();
+        }
+    </script>
+</body>
+</html>
