@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>POS Operations & Engineer Roll-Out Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS Library for Reading Excel Files (.xlsx) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -24,7 +25,7 @@
         header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; }
         h1 { font-size: 24px; font-weight: 700; color: #fff; }
         
-        .upload-section { background: var(--card-bg); padding: 15px 20px; border-radius: 10px; border: 1px solid var(--border-color); margin-bottom: 25px; display: flex; align-items: center; gap: 15px; }
+        .upload-section { background: var(--card-bg); padding: 15px 20px; border-radius: 10px; border: 1px solid var(--border-color); margin-bottom: 25px; display: flex; align-items: center; justify-content: space-between; }
         .upload-section input[type="file"] { color: var(--text-muted); }
         
         .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
@@ -35,10 +36,10 @@
         .kpi-title { font-size: 13px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
         .kpi-value { font-size: 28px; font-weight: 700; margin-top: 8px; color: #fff; }
 
-        .table-container { background: var(--card-bg); border-radius: 10px; border: 1px solid var(--border-color); overflow-x: auto; margin-bottom: 30px; }
+        .table-container { background: var(--card-bg); border-radius: 10px; border: 1px solid var(--border-color); overflow-x: auto; max-height: 600px; }
         table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; white-space: nowrap; }
         th, td { padding: 12px 15px; border-bottom: 1px solid var(--border-color); }
-        th { background: #0f172a; color: var(--text-muted); font-weight: 600; position: sticky; top: 0; }
+        th { background: #0f172a; color: var(--text-muted); font-weight: 600; position: sticky; top: 0; z-index: 10; }
         tr:hover { background: rgba(255,255,255,0.02); }
         
         .btn { background: var(--accent-blue); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; }
@@ -49,16 +50,16 @@
     <div class="container">
         <header>
             <h1>POS Operations & Engineer Roll-Out Dashboard</h1>
-            <button class="btn" onclick="exportData()">Export CSV</button>
+            <button class="btn" onclick="exportData()">Export Excel / CSV</button>
         </header>
 
         <!-- File Upload Section -->
         <div class="upload-section">
             <div>
-                <strong>Upload Daily Excel/CSV:</strong>
-                <p style="font-size: 12px; color: var(--text-muted);">Upload your daily usage file. Duplicate TID/Serial will automatically move old records to Withdrawn.</p>
+                <strong>Upload Daily Excel (.xlsx / .csv):</strong>
+                <p style="font-size: 12px; color: var(--text-muted);">Duplicate TID or POS Serial will automatically move old records to Withdrawn.</p>
             </div>
-            <input type="file" id="csvFileInput" accept=".csv, .xlsx" onchange="handleFileUpload(event)">
+            <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" onchange="handleExcelUpload(event)">
         </div>
 
         <!-- KPI Cards -->
@@ -102,11 +103,11 @@
                         <th>SIM CARRIER</th>
                         <th>ROLL OUT DATE</th>
                         <th>ROLL OUT BY</th>
-                        <th>WITHDRAWN REPORT</th>
+                        <th>STATUS</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
-                    <!-- Dynamic Data -->
+                    <tr><td colspan="13" style="text-align: center; color: var(--text-muted);">Please upload your Excel file above.</td></tr>
                 </tbody>
             </table>
         </div>
@@ -115,46 +116,59 @@
     <script>
         let masterData = [];
 
-        function handleFileUpload(event) {
+        function handleExcelUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
-            
+
             const reader = new FileReader();
             reader.onload = function(e) {
-                const text = e.target.result;
-                parseCSV(text);
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                
+                // Get first sheet
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                // Convert to JSON
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                processExcelData(jsonData);
             };
-            reader.readAsText(file);
+            reader.readAsArrayBuffer(file);
         }
 
-        function parseCSV(text) {
-            const lines = text.split('\n');
-            const headers = lines[0].split(',').map(h => h.trim());
+        function processExcelData(rows) {
+            if (rows.length < 2) return;
             
-            for(let i = 1; i < lines.length; i++) {
-                if(!lines[i].trim()) continue;
-                const cols = lines[i].split(',').map(c => c.trim());
-                
+            // Assuming row 0 is header, parse from row 1 onwards
+            for (let i = 1; i < rows.length; i++) {
+                let cols = rows[i];
+                if (!cols || cols.length === 0) continue;
+
                 let rowObj = {
                     sl: cols[0] || masterData.length + 1,
-                    purpose: cols[1] || 'NEW',
-                    configDate: cols[2] || '',
-                    tid: cols[6] || cols[3] || '',
-                    mid: cols[5] || '',
-                    merchant: cols[7] || '',
-                    location: cols[11] || '',
-                    model: cols[14] || '',
-                    serial: cols[15] || '',
-                    carrier: cols[19] || '',
-                    rollOutDate: cols[26] || '',
-                    rollOutBy: cols[27] || '',
-                    withdrawn: cols[31] || ''
+                    purpose: String(cols[1] || 'NEW'),
+                    configDate: String(cols[2] || ''),
+                    tid: String(cols[6] || cols[3] || ''),
+                    mid: String(cols[5] || ''),
+                    merchant: String(cols[7] || ''),
+                    location: String(cols[11] || ''),
+                    model: String(cols[14] || ''),
+                    serial: String(cols[15] || ''),
+                    carrier: String(cols[19] || ''),
+                    rollOutDate: String(cols[26] || ''),
+                    rollOutBy: String(cols[27] || ''),
+                    status: 'ACTIVE'
                 };
 
-                // Check duplicate TID or Serial -> Move old to Withdrawn
-                let existingIndex = masterData.findIndex(item => item.tid === rowObj.tid || item.serial === rowObj.serial);
-                if(existingIndex !== -1) {
-                    masterData[existingIndex].withdrawn = 'YES (Replaced/Withdrawn)';
+                if (!rowObj.tid && !rowObj.serial) continue;
+
+                // Check duplicate TID or POS Serial -> Move old to Withdrawn
+                let existingIndex = masterData.findIndex(item => 
+                    (item.tid && item.tid === rowObj.tid) || (item.serial && item.serial === rowObj.serial)
+                );
+                
+                if (existingIndex !== -1) {
+                    masterData[existingIndex].status = 'WITHDRAWN';
                 }
 
                 masterData.push(rowObj);
@@ -164,8 +178,8 @@
 
         function updateDashboard() {
             let total = masterData.length;
-            let withdrawn = masterData.filter(i => i.withdrawn && i.withdrawn !== '').length;
-            let replacement = masterData.filter(i => i.purpose.includes('REPLACE')).length;
+            let withdrawn = masterData.filter(i => i.status === 'WITHDRAWN').length;
+            let replacement = masterData.filter(i => i.purpose.toUpperCase().includes('REPLACE')).length;
             let live = total - withdrawn;
             let pending = masterData.filter(i => !i.rollOutDate).length;
 
@@ -177,6 +191,7 @@
 
             let tbody = document.getElementById('tableBody');
             tbody.innerHTML = '';
+            
             masterData.forEach((row, idx) => {
                 let tr = document.createElement('tr');
                 tr.innerHTML = `
@@ -192,22 +207,21 @@
                     <td>${row.carrier}</td>
                     <td>${row.rollOutDate}</td>
                     <td>${row.rollOutBy}</td>
-                    <td style="color: ${row.withdrawn ? '#ef4444' : '#10b981'}">${row.withdrawn || 'ACTIVE'}</td>
+                    <td style="color: ${row.status === 'WITHDRAWN' ? '#ef4444' : '#10b981'}; font-weight:600;">${row.status}</td>
                 `;
                 tbody.appendChild(tr);
             });
         }
 
         function exportData() {
-            let csv = 'SL,Purpose,Config Date,TID,MID,Merchant,Location,Model,Serial,Carrier,RollOut Date,RollOut By,Withdrawn\n';
-            masterData.forEach(r => {
-                csv += `"${r.sl}","${r.purpose}","${r.configDate}","${r.tid}","${r.mid}","${r.merchant}","${r.location}","${r.model}","${r.serial}","${r.carrier}","${r.rollOutDate}","${r.rollOutBy}","${r.withdrawn}"\n`;
-            });
-            let blob = new Blob([csv], { type: 'csv' });
-            let link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = 'POS_Dashboard_Export.csv';
-            link.click();
+            if (masterData.length === 0) {
+                alert("No data available to export!");
+                return;
+            }
+            const ws = XLSX.utils.json_to_sheet(masterData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Master Dashboard");
+            XLSX.writeFile(wb, "POS_Dashboard_Export.xlsx");
         }
     </script>
 </body>
