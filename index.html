@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS Terminal Management Dashboard</title>
+    <!-- Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SheetJS to read Excel/CSV files directly -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-100 font-sans text-slate-800">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-indigo-700 text-white shadow-md">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <i class="fa-solid fa-cash-register text-3xl"></i>
+                <h1 class="text-2xl font-bold">POS Terminal Dashboard</h1>
+            </div>
+            <!-- File Upload Input -->
+            <div class="flex items-center bg-indigo-800 px-4 py-2 rounded-lg border border-indigo-500">
+                <label for="excelFile" class="cursor-pointer flex items-center space-x-2 text-sm font-medium">
+                    <i class="fa-solid fa-file-excel text-green-400 text-lg"></i>
+                    <span>আপনার এক্সেল/সিএসভি ফাইল আপলোড করুন</span>
+                </label>
+                <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleFileUpload(event)">
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+
+        <!-- Summary Statistics Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center space-x-4">
+                <div class="bg-blue-100 text-blue-600 p-3 rounded-lg text-xl"><i class="fa-solid fa-terminal"></i></div>
+                <div>
+                    <p class="text-xs text-slate-500 uppercase font-semibold">মোট টার্মিনাল (Total POS)</p>
+                    <h3 id="totalPOS" class="text-2xl font-bold text-slate-700">০</h3>
+                </div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center space-x-4">
+                <div class="bg-green-100 text-green-600 p-3 rounded-lg text-xl"><i class="fa-solid fa-city"></i></div>
+                <div>
+                    <p class="text-xs text-slate-500 uppercase font-semibold">ভিন্ন ভিন্ন সিটি (Cities)</p>
+                    <h3 id="totalCity" class="text-2xl font-bold text-slate-700">০</h3>
+                </div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center space-x-4">
+                <div class="bg-purple-100 text-purple-600 p-3 rounded-lg text-xl"><i class="fa-solid fa-sim-card"></i></div>
+                <div>
+                    <p class="text-xs text-slate-500 uppercase font-semibold">সিম ক্যারিয়ার (Carriers)</p>
+                    <h3 id="totalCarriers" class="text-2xl font-bold text-slate-700">০</h3>
+                </div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center space-x-4">
+                <div class="bg-amber-100 text-amber-600 p-3 rounded-lg text-xl"><i class="fa-solid fa-toolbox"></i></div>
+                <div>
+                    <p class="text-xs text-slate-500 uppercase font-semibold">ভেন্ডর সংখ্যা (Vendors)</p>
+                    <h3 id="totalVendor" class="text-2xl font-bold text-slate-700">০</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search and Filter Bar -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between gap-4">
+            <div class="relative flex-1">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                    <i class="fa-solid fa-search"></i>
+                </span>
+                <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="মার्चেন্ট নাম, টিআইডি বা এমআইডি দিয়ে খুঁজুন..." class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+            </div>
+            <div class="text-xs text-slate-500 flex items-center">
+                <span>💡 ফাইল আপলোড করলেই নিচের টেবিল ও কার্ডগুলো অটো আপডেট হয়ে যাবে।</span>
+            </div>
+        </div>
+
+        <!-- Data Table Section -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                <h3 class="font-bold text-slate-700"><i class="fa-solid fa-table mr-2 text-indigo-600"></i>POS টার্মিনাল তালিকা</h3>
+                <span id="rowCount" class="text-xs bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full font-semibold">০ টি এন্ট্রি</span>
+            </div>
+            <div class="overflow-x-auto max-h-[500px]">
+                <table id="posTable" class="w-full text-left border-collapse text-sm">
+                    <thead class="bg-slate-100 text-slate-600 uppercase text-xs sticky top-0">
+                        <tr>
+                            <th class="p-3">SL</th>
+                            <th class="p-3">Merchant Name</th>
+                            <th class="p-3">MID</th>
+                            <th class="p-3">TID</th>
+                            <th class="p-3">POS Model</th>
+                            <th class="p-3">City</th>
+                            <th class="p-3">Vendor</th>
+                            <th class="p-3">SIM Carrier</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-slate-200">
+                        <tr>
+                            <td colspan="8" class="p-8 text-center text-slate-400">
+                                <i class="fa-solid fa-file-excel text-4xl mb-2 text-slate-300 block"></i>
+                                এখনো কোনো ফাইল আপলোড করা হয়নি। উপরের ফাইল আপলোড অপশন থেকে আপনার এক্সেল ফাইলটি সিলেক্ট করুন।
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- JavaScript for Handling Excel & UI -->
+    <script>
+        let globalData = [];
+
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                // Convert excel data to JSON
+                globalData = XLSX.utils.sheet_to_json(worksheet);
+                
+                updateDashboard(globalData);
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function updateDashboard(data) {
+            if (!data || data.length === 0) return;
+
+            // Update stats
+            document.getElementById('totalPOS').innerText = data.length;
+            
+            const cities = new Set(data.map(item => item['CITY'] || item['City']).filter(Boolean));
+            document.getElementById('totalCity').innerText = cities.size;
+
+            const carriers = new Set(data.map(item => item['SIM CARRIER '] || item['SIM CARRIER']).filter(Boolean));
+            document.getElementById('totalCarriers').innerText = carriers.size;
+
+            const vendors = new Set(data.map(item => item['VENDOR'] || item['Vendor']).filter(Boolean));
+            document.getElementById('totalVendor').innerText = vendors.size;
+
+            document.getElementById('rowCount').innerText = data.length + ' টি এন্ট্রি';
+
+            renderTable(data);
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            data.forEach((row, index) => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition-colors';
+                
+                tr.innerHTML = `
+                    <td class="p-3">${row['SL.'] || (index + 1)}</td>
+                    <td class="p-3 font-semibold text-slate-700">${row['MERCHANT NAME'] || '-'}</td>
+                    <td class="p-3 text-slate-600">${row['MID '] || row['MID'] || '-'}</td>
+                    <td class="p-3 text-slate-600">${row['TID'] || '-'}</td>
+                    <td class="p-3"><span class="bg-slate-100 px-2 py-0.5 rounded text-xs font-medium">${row['POS MODEL'] || '-'}</span></td>
+                    <td class="p-3">${row['CITY'] || '-'}</td>
+                    <td class="p-3">${row['VENDOR'] || '-'}</td>
+                    <td class="p-3"><span class="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-xs font-semibold">${row['SIM CARRIER '] || row['SIM CARRIER'] || '-'}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function filterTable() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = globalData.filter(row => {
+                const merchant = String(row['MERCHANT NAME'] || '').toLowerCase();
+                const mid = String(row['MID '] || row['MID'] || '').toLowerCase();
+                const tid = String(row['TID'] || '').toLowerCase();
+                return merchant.includes(query) || mid.includes(query) || tid.includes(query);
+            });
+            renderTable(filtered);
+            document.getElementById('rowCount').innerText = filtered.length + ' টি ফিল্টারড এন্ট্রি';
+        }
+    </script>
+</body>
+</html>
