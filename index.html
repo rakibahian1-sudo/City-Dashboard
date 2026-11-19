@@ -95,7 +95,7 @@
                 </label>
 
                 <div class="text-right pl-2.5 border-l border-line">
-                    <div id="liveClock" class="text-base sm:text-lg font-bold text-amber-300 leading-none font-mono">10:17:00 PM</div>
+                    <div id="liveClock" class="text-base sm:text-lg font-bold text-amber-300 leading-none font-mono">10:46:00 PM</div>
                     <div id="liveDate" class="text-[10px] font-semibold tracking-wider text-slate-400 uppercase mt-1">THU, NOV 19, 2026</div>
                 </div>
             </div>
@@ -208,7 +208,7 @@
                 </div>
 
                 <div class="lg:col-span-2 flex items-center gap-2">
-                    <label id="rolloutSheetLabel" title="Upload Rollout Excel/CSV to filter & preview only matching LIVE TIDs with Excel App Version"
+                    <label id="rolloutSheetLabel" title="Upload Rollout Excel/CSV to match LIVE TIDs & update exact Excel values without overwriting existing LIVE fields"
                         class="bg-elevated hover:bg-slate-800 text-amber-200 border border-amber-300/35 px-2.5 py-2 rounded-lg text-xs font-semibold cursor-pointer flex-1 text-center truncate transition">
                         <i class="fa-solid fa-file-excel mr-1 text-amber-300"></i><span id="rolloutSheetBtnText">Sheet</span>
                         <input id="rolloutPanelFileInput" type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleRolloutSheetPreview(event)">
@@ -227,7 +227,7 @@
                     <div class="space-y-0.5">
                         <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-teal-300">
                             <i class="fa-solid fa-table-list text-amber-300"></i>
-                            <span>LIVE TID Match Preview & Manual Edit (Includes App Version Preview)</span>
+                            <span>LIVE TID Match Preview & Manual Edit (Exact Excel Values Preserved; Existing LIVE Data Safe)</span>
                         </div>
                         <p id="rolloutPreviewSummary" class="text-xs text-slate-300"></p>
                     </div>
@@ -1114,8 +1114,9 @@
             const defaultEng = document.getElementById('rolloutPanelEngineerSelect').value;
             const defaultDateIso = document.getElementById('rolloutPanelDatePicker').value;
             rolloutPreviewRows.forEach(item => {
-                if (!item.rollOutBy) item.rollOutBy = defaultEng;
-                if (!item.rollOutDate) {
+                // Only fill defaults for search mode or when blank; never overwrite Excel sheet values
+                if (item.source === 'search') {
+                    item.rollOutBy = defaultEng;
                     const liveMatch = findLiveRowByTid(item.tid);
                     item.rollOutDate = formatChosenDate(defaultDateIso, liveMatch ? getCell(liveMatch, 'CONFIG DATE') : '');
                 }
@@ -1123,6 +1124,8 @@
             renderRolloutPreviewTable();
         }
 
+        // Preserve exact Excel values for ROLL OUT DATE, ROLL OUT BY, QR, LIMIT, SPECIAL FUNCTIONALITY
+        // without overwriting existing LIVE fields when Excel cells are blank
         function buildPreviewRowFromExcel(rr, defaultEng, defaultDateIso) {
             const tidRaw = (getCell(rr, 'TID') || getCell(rr, 'TERMINAL ID') || '').trim();
             const tidUpper = tidRaw.toUpperCase();
@@ -1135,54 +1138,38 @@
                 ''
             ).trim();
 
-            const specialFunc = (
+            // Exact values from Excel (only fallback to existing LIVE value if Excel cell is empty, so LIVE data is never erased)
+            const excelSpecialFunc = (
                 getCell(rr, 'SPECIAL FUNCTIONALITY') ||
                 getCell(rr, 'SPECIAL_FUNCTIONALITY') ||
                 getCell(rr, 'FEATURE') ||
-                (liveMatch ? getCell(liveMatch, 'SPECIAL FUNCTIONALITY') : '') ||
                 ''
             ).trim();
 
-            const rollDateRaw = (
+            const excelRollDate = (
                 getCell(rr, 'ROLL OUT DATE') ||
                 getCell(rr, 'ROLLOUT DATE') ||
                 getCell(rr, 'DATE') ||
                 ''
             ).trim();
 
-            const engRaw = (
+            const excelEng = (
                 getCell(rr, 'ROLL OUT BY') ||
                 getCell(rr, 'ROLLOUT BY') ||
                 getCell(rr, 'ENGINEER') ||
                 ''
             ).trim();
 
-            const qrRaw = (
-                getCell(rr, 'QR') ||
-                (liveMatch ? getCell(liveMatch, 'QR') : '') ||
-                ''
-            ).trim();
-
-            const limitRaw = (
-                getCell(rr, 'LIMIT') ||
-                (liveMatch ? getCell(liveMatch, 'LIMIT') : '') ||
-                ''
-            ).trim();
+            const excelQr = (getCell(rr, 'QR') || '').trim();
+            const excelLimit = (getCell(rr, 'LIMIT') || '').trim();
 
             const statusRaw = (
                 getCell(rr, 'STATUS') ||
                 getCell(rr, 'REMARKS (IF ANY)') ||
                 getCell(rr, 'REMARKS') ||
                 getCell(rr, 'NW OS/ PROFILE DATE') ||
-                'Done'
+                ''
             ).trim();
-
-            const matchedEng = detectEngineerFromFixedList(engRaw);
-            const parsedIso = parseAnyDateToIso(rollDateRaw);
-            const cfgDate = liveMatch ? getCell(liveMatch, 'CONFIG DATE') : '';
-            const formattedDate = rollDateRaw && !parsedIso
-                ? rollDateRaw
-                : formatChosenDate(parsedIso || defaultDateIso, cfgDate);
 
             const merchantLabel = liveMatch
                 ? (getCell(liveMatch, 'MERCHANT NAME') || getCell(liveMatch, 'DBA NAME') || 'Live Terminal')
@@ -1193,13 +1180,13 @@
                 tid: tidUpper,
                 matched: Boolean(liveMatch),
                 merchantLabel,
-                status: normalizeCaseText(statusRaw || 'Done') || 'Done',
-                appVersion: excelAppVer || activeAppVersion,
-                specialFunctionality: specialFunc,
-                rollOutDate: formattedDate,
-                rollOutBy: matchedEng || defaultEng,
-                qr: qrRaw ? normalizeCaseText(qrRaw) : '',
-                limit: limitRaw
+                status: statusRaw ? normalizeCaseText(statusRaw) : '',
+                appVersion: excelAppVer,
+                specialFunctionality: excelSpecialFunc,
+                rollOutDate: excelRollDate,
+                rollOutBy: excelEng,
+                qr: excelQr,
+                limit: excelLimit
             };
         }
 
@@ -1236,9 +1223,7 @@
                 `Showing <strong class="text-white">${rolloutPreviewRows.length}</strong> row(s)${sheetFilterNote} • ` +
                 `<strong class="text-teal-300">${matchedCount} Matched in LIVE</strong> • ` +
                 `<strong class="${missingCount > 0 ? 'text-rose-300' : 'text-slate-400'}">${missingCount} Not in LIVE</strong> • ` +
-                `<strong class="${missingFieldsCount > 0 ? 'text-amber-300' : 'text-teal-300'}">${missingFieldsCount} Blank/Missing Field(s)</strong> (edit below if needed, then click <strong>Upload to LIVE</strong>)`;
-
-            const engOptionsHtml = engineers.map(e => `<option value="${e}">${e}</option>`).join('');
+                `<strong class="${missingFieldsCount > 0 ? 'text-amber-300' : 'text-teal-300'}">${missingFieldsCount} Blank Cell(s)</strong> (Blank cells keep existing LIVE values)`;
 
             tbody.innerHTML = rolloutPreviewRows.map((item, idx) => {
                 const liveFound = findLiveRowByTid(item.tid);
@@ -1250,12 +1235,13 @@
                     : 'bg-rose-500/20 text-rose-300 border-rose-400/45';
                 const badgeText = liveFound ? 'MATCHED' : 'NO LIVE TID';
 
+                // For sheet mode, always keep exact Excel engineer name in an editable input (or dropdown if in list)
                 const hasEngInList = engineers.includes(item.rollOutBy);
-                const selectHtml = hasEngInList
+                const engCellHtml = (item.source === 'search' && hasEngInList)
                     ? `<select onchange="updatePreviewField(${idx}, 'rollOutBy', this.value)" class="bg-elevated border border-line rounded px-2 py-1 text-xs text-white w-28 outline-none">
                         ${engineers.map(e => `<option value="${e}" ${e === item.rollOutBy ? 'selected' : ''}>${e}</option>`).join('')}
                        </select>`
-                    : `<input type="text" value="${item.rollOutBy || ''}" placeholder="Engineer..." onchange="updatePreviewField(${idx}, 'rollOutBy', this.value)"
+                    : `<input type="text" value="${item.rollOutBy || ''}" placeholder="${liveFound ? (getCell(liveFound, 'ROLL OUT BY') || 'Keep LIVE') : 'Engineer...'}" onchange="updatePreviewField(${idx}, 'rollOutBy', this.value)"
                         class="bg-elevated border ${!item.rollOutBy ? 'border-amber-300/60' : 'border-line'} rounded px-2 py-1 text-xs text-white w-28 outline-none">`;
 
                 return `
@@ -1269,29 +1255,29 @@
                         </td>
                         <td class="py-2 px-2.5 max-w-[180px] truncate text-slate-300" title="${mLabel}">${mLabel}</td>
                         <td class="py-2 px-2.5 whitespace-nowrap">
-                            <input type="text" value="${item.status || 'Done'}" onchange="updatePreviewField(${idx}, 'status', this.value)"
+                            <input type="text" value="${item.status || ''}" placeholder="${item.source === 'sheet' ? 'Keep LIVE' : 'Done'}" onchange="updatePreviewField(${idx}, 'status', this.value)"
                                 class="bg-elevated border border-line rounded px-2 py-1 text-xs text-amber-200 w-28 outline-none">
                         </td>
                         <td class="py-2 px-2.5 whitespace-nowrap">
-                            <input type="text" value="${item.appVersion || ''}" placeholder="Ver..." onchange="updatePreviewField(${idx}, 'appVersion', this.value)"
+                            <input type="text" value="${item.appVersion || ''}" placeholder="${liveFound ? (getCell(liveFound, 'APP VERSION') || 'Keep LIVE') : 'Ver...'}" onchange="updatePreviewField(${idx}, 'appVersion', this.value)"
                                 class="bg-elevated border ${!item.appVersion ? 'border-amber-300/60' : 'border-purple-400/50'} rounded px-2 py-1 text-xs font-bold text-purple-200 w-20 outline-none">
                         </td>
                         <td class="py-2 px-2.5 whitespace-nowrap">
-                            <input type="text" value="${item.specialFunctionality || ''}" placeholder="Fill missing..." onchange="updatePreviewField(${idx}, 'specialFunctionality', this.value)"
+                            <input type="text" value="${item.specialFunctionality || ''}" placeholder="${liveFound ? (getCell(liveFound, 'SPECIAL FUNCTIONALITY') || 'Keep LIVE') : 'Fill...'}" onchange="updatePreviewField(${idx}, 'specialFunctionality', this.value)"
                                 class="bg-elevated border ${!item.specialFunctionality ? 'border-amber-300/60' : 'border-line'} rounded px-2 py-1 text-xs text-white w-36 outline-none">
                         </td>
                         <td class="py-2 px-2.5 whitespace-nowrap">
-                            <input type="text" value="${item.rollOutDate || ''}" placeholder="MM/DD/YYYY" onchange="updatePreviewField(${idx}, 'rollOutDate', this.value)"
-                                class="bg-elevated border ${!item.rollOutDate ? 'border-amber-300/60' : 'border-line'} rounded px-2 py-1 text-xs text-white w-24 outline-none">
+                            <input type="text" value="${item.rollOutDate || ''}" placeholder="${liveFound ? (getCell(liveFound, 'ROLL OUT DATE') || 'Keep LIVE') : 'Date...'}" onchange="updatePreviewField(${idx}, 'rollOutDate', this.value)"
+                                class="bg-elevated border ${!item.rollOutDate ? 'border-amber-300/60' : 'border-line'} rounded px-2 py-1 text-xs text-white w-28 outline-none">
                         </td>
-                        <td class="py-2 px-2.5 whitespace-nowrap">${selectHtml || engOptionsHtml}</td>
+                        <td class="py-2 px-2.5 whitespace-nowrap">${engCellHtml}</td>
                         <td class="py-2 px-2.5 whitespace-nowrap">
-                            <input type="text" value="${item.qr || ''}" placeholder="Yes / No" onchange="updatePreviewField(${idx}, 'qr', this.value)"
-                                class="bg-elevated border ${!item.qr ? 'border-amber-300/60' : 'border-line'} rounded px-2 py-1 text-xs text-white w-16 outline-none">
+                            <input type="text" value="${item.qr || ''}" placeholder="${liveFound ? (getCell(liveFound, 'QR') || 'Keep LIVE') : 'QR...'}" onchange="updatePreviewField(${idx}, 'qr', this.value)"
+                                class="bg-elevated border ${!item.qr ? 'border-amber-300/60' : 'border-line'} rounded px-2 py-1 text-xs text-white w-20 outline-none">
                         </td>
                         <td class="py-2 px-2.5 whitespace-nowrap">
-                            <input type="text" value="${item.limit || ''}" placeholder="Limit..." onchange="updatePreviewField(${idx}, 'limit', this.value)"
-                                class="bg-elevated border ${!item.limit ? 'border-amber-300/60' : 'border-line'} rounded px-2 py-1 text-xs text-white w-20 outline-none">
+                            <input type="text" value="${item.limit || ''}" placeholder="${liveFound ? (getCell(liveFound, 'LIMIT') || 'Keep LIVE') : 'Limit...'}" onchange="updatePreviewField(${idx}, 'limit', this.value)"
+                                class="bg-elevated border ${!item.limit ? 'border-amber-300/60' : 'border-line'} rounded px-2 py-1 text-xs text-white w-24 outline-none">
                         </td>
                         <td class="py-2 px-2.5 text-center whitespace-nowrap">
                             <button onclick="removePreviewRow(${idx})" title="Remove row" class="text-rose-300 hover:text-rose-200 px-1.5 py-1">
@@ -1315,17 +1301,6 @@
             rolloutPreviewRows[idx].tid = cleanTid;
             const liveMatch = findLiveRowByTid(cleanTid);
             rolloutPreviewRows[idx].matched = Boolean(liveMatch);
-            if (liveMatch) {
-                if (!rolloutPreviewRows[idx].specialFunctionality) {
-                    rolloutPreviewRows[idx].specialFunctionality = getCell(liveMatch, 'SPECIAL FUNCTIONALITY');
-                }
-                if (!rolloutPreviewRows[idx].qr) {
-                    rolloutPreviewRows[idx].qr = getCell(liveMatch, 'QR');
-                }
-                if (!rolloutPreviewRows[idx].limit) {
-                    rolloutPreviewRows[idx].limit = getCell(liveMatch, 'LIMIT');
-                }
-            }
             renderRolloutPreviewTable();
         }
 
@@ -1382,10 +1357,7 @@
                 return;
             }
 
-            let firstMatchedEngineer = '';
-            let firstDateIso = '';
             const matchedLineEntries = [];
-
             const activeEngInitial = document.getElementById('rolloutPanelEngineerSelect').value;
             const activeIsoInitial = document.getElementById('rolloutPanelDatePicker').value;
 
@@ -1396,22 +1368,13 @@
             lastSheetUnmatchedCount = Math.max(0, rRows.length - onlyMatchedInLive.length);
 
             onlyMatchedInLive.forEach(item => {
-                if (!firstMatchedEngineer && item.rollOutBy && engineers.includes(item.rollOutBy)) {
-                    firstMatchedEngineer = item.rollOutBy;
+                if (!item.status || item.status.toLowerCase() === 'done') {
+                    matchedLineEntries.push(item.tid);
+                } else {
+                    matchedLineEntries.push(`${item.tid} ${item.status}`);
                 }
-                if (!firstDateIso && item.rollOutDate) {
-                    const iso = parseAnyDateToIso(item.rollOutDate);
-                    if (iso) firstDateIso = iso;
-                }
-                matchedLineEntries.push(item.status.toLowerCase() === 'done' ? item.tid : `${item.tid} ${item.status}`);
             });
 
-            if (firstMatchedEngineer) {
-                document.getElementById('rolloutPanelEngineerSelect').value = firstMatchedEngineer;
-            }
-            if (firstDateIso) {
-                document.getElementById('rolloutPanelDatePicker').value = firstDateIso;
-            }
             document.getElementById('quickTidStatusInput').value = matchedLineEntries.join('\n');
 
             rolloutPreviewRows = onlyMatchedInLive;
@@ -1431,18 +1394,16 @@
             const fileInput = document.getElementById('rolloutPanelFileInput');
             const hadSheetInput = isSheetRolloutMode || Boolean(fileInput && fileInput.files && fileInput.files[0]);
 
-            const tidStatusMap = new Map();
-            const sheetDetailsMap = new Map();
+            const tidDetailsMap = new Map();
 
             if (rolloutPreviewRows && rolloutPreviewRows.length > 0) {
                 rolloutPreviewRows.forEach(pr => {
                     const tid = String(pr.tid || '').trim().toUpperCase();
                     if (!tid) return;
-                    const st = normalizeCaseText(pr.status || 'Done') || 'Done';
-                    tidStatusMap.set(tid, st);
-                    sheetDetailsMap.set(tid, {
-                        status: st,
-                        appVersion: (pr.appVersion || activeAppVersion).trim(),
+                    tidDetailsMap.set(tid, {
+                        source: pr.source || (hadSheetInput ? 'sheet' : 'search'),
+                        status: (pr.status || '').trim(),
+                        appVersion: (pr.appVersion || '').trim(),
                         specialFunctionality: (pr.specialFunctionality || '').trim(),
                         rollOutDate: (pr.rollOutDate || '').trim(),
                         rollOutBy: (pr.rollOutBy || '').trim(),
@@ -1457,15 +1418,25 @@
                 rRows.forEach(rr => {
                     const pr = buildPreviewRowFromExcel(rr, defaultEng, defaultDateIso);
                     if (!pr.tid || !pr.matched) return;
-                    tidStatusMap.set(pr.tid, pr.status);
-                    sheetDetailsMap.set(pr.tid, pr);
+                    tidDetailsMap.set(pr.tid, pr);
                 });
             } else {
                 const parsed = parseTidStatusLines(rawLines);
-                parsed.forEach((st, tid) => tidStatusMap.set(tid, st));
+                parsed.forEach((st, tid) => {
+                    tidDetailsMap.set(tid, {
+                        source: 'search',
+                        status: st,
+                        appVersion: activeAppVersion,
+                        specialFunctionality: '',
+                        rollOutDate: '',
+                        rollOutBy: defaultEng,
+                        qr: '',
+                        limit: ''
+                    });
+                });
             }
 
-            if (tidStatusMap.size === 0) {
+            if (tidDetailsMap.size === 0) {
                 showToast('No matching LIVE TIDs ready to upload');
                 return;
             }
@@ -1475,47 +1446,77 @@
             liveRows.forEach(row => {
                 const tid = getCell(row, 'TID').toUpperCase();
                 const oldTid = getCell(row, 'OLD TID').toUpperCase();
-                const matchedKey = tidStatusMap.has(tid) ? tid : (tidStatusMap.has(oldTid) ? oldTid : '');
+                const matchedKey = tidDetailsMap.has(tid) ? tid : (tidDetailsMap.has(oldTid) ? oldTid : '');
                 if (!matchedKey) return;
 
-                const sDet = sheetDetailsMap.get(matchedKey);
-                const rawStatus = sDet ? sDet.status : tidStatusMap.get(matchedKey);
-                const statusText = normalizeCaseText(rawStatus || 'Done');
-                const isDoneStatus = statusText.toLowerCase() === 'done';
+                const sDet = tidDetailsMap.get(matchedKey);
+                const isFromSheet = sDet.source === 'sheet';
 
-                const rowEng = (sDet && sDet.rollOutBy) ? sDet.rollOutBy : defaultEng;
-                const rowAppVer = (sDet && sDet.appVersion) ? sDet.appVersion : activeAppVersion;
-                const cfgDate = getCell(row, 'CONFIG DATE');
-                const formattedRolloutDate = (sDet && sDet.rollOutDate)
-                    ? sDet.rollOutDate
-                    : formatChosenDate(defaultDateIso, cfgDate);
-
-                setCell(row, 'ROLL OUT BY', rowEng);
-                setCell(row, 'ROLL OUT DATE', formattedRolloutDate);
-                setCell(row, 'APP VERSION', rowAppVer);
-
-                if (sDet && sDet.specialFunctionality) {
-                    setCell(row, 'SPECIAL FUNCTIONALITY', sDet.specialFunctionality);
-                }
-                if (sDet && sDet.qr) {
-                    setCell(row, 'QR', normalizeCaseText(sDet.qr));
-                }
-                if (sDet && sDet.limit) {
-                    setCell(row, 'LIMIT', sDet.limit);
-                }
-
-                if (isDoneStatus) {
-                    setCell(row, 'NW OS/ PROFILE DATE', 'Done');
+                if (isFromSheet) {
+                    // Update ONLY with non-empty values from Excel; never erase existing LIVE data
+                    if (sDet.rollOutBy) {
+                        setCell(row, 'ROLL OUT BY', sDet.rollOutBy);
+                    }
+                    if (sDet.rollOutDate) {
+                        setCell(row, 'ROLL OUT DATE', sDet.rollOutDate);
+                    }
+                    if (sDet.appVersion) {
+                        setCell(row, 'APP VERSION', sDet.appVersion);
+                    }
+                    if (sDet.specialFunctionality) {
+                        setCell(row, 'SPECIAL FUNCTIONALITY', sDet.specialFunctionality);
+                    }
+                    if (sDet.qr) {
+                        setCell(row, 'QR', sDet.qr);
+                    }
+                    if (sDet.limit) {
+                        setCell(row, 'LIMIT', sDet.limit);
+                    }
+                    if (sDet.status) {
+                        const statusText = normalizeCaseText(sDet.status);
+                        if (statusText.toLowerCase() === 'done') {
+                            setCell(row, 'NW OS/ PROFILE DATE', 'Done');
+                        } else {
+                            const prevRemarks = getCell(row, 'REMARKS (IF ANY)');
+                            const merged = prevRemarks ? `${prevRemarks} | ${statusText}` : statusText;
+                            setCell(row, 'REMARKS (IF ANY)', merged);
+                        }
+                    }
                 } else {
-                    const prevRemarks = getCell(row, 'REMARKS (IF ANY)');
-                    const merged = prevRemarks ? `${prevRemarks} | ${statusText}` : statusText;
-                    setCell(row, 'REMARKS (IF ANY)', merged);
+                    // Search / text input mode
+                    const statusText = normalizeCaseText(sDet.status || 'Done');
+                    const isDoneStatus = statusText.toLowerCase() === 'done';
+                    const rowEng = sDet.rollOutBy || defaultEng;
+                    const rowAppVer = sDet.appVersion || activeAppVersion;
+                    const cfgDate = getCell(row, 'CONFIG DATE');
+                    const formattedRolloutDate = sDet.rollOutDate || formatChosenDate(defaultDateIso, cfgDate);
+
+                    setCell(row, 'ROLL OUT BY', rowEng);
+                    setCell(row, 'ROLL OUT DATE', formattedRolloutDate);
+                    setCell(row, 'APP VERSION', rowAppVer);
+
+                    if (sDet.specialFunctionality) {
+                        setCell(row, 'SPECIAL FUNCTIONALITY', sDet.specialFunctionality);
+                    }
+                    if (sDet.qr) {
+                        setCell(row, 'QR', sDet.qr);
+                    }
+                    if (sDet.limit) {
+                        setCell(row, 'LIMIT', sDet.limit);
+                    }
+
+                    if (isDoneStatus) {
+                        setCell(row, 'NW OS/ PROFILE DATE', 'Done');
+                    } else {
+                        const prevRemarks = getCell(row, 'REMARKS (IF ANY)');
+                        const merged = prevRemarks ? `${prevRemarks} | ${statusText}` : statusText;
+                        setCell(row, 'REMARKS (IF ANY)', merged);
+                    }
                 }
 
                 updatedCount++;
             });
 
-            // Automatically clear/delete the TIDs from the search input box after Excel upload
             if (hadSheetInput) {
                 document.getElementById('quickTidStatusInput').value = '';
             }
