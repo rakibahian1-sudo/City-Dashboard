@@ -95,7 +95,7 @@
                 </label>
 
                 <div class="text-right pl-2.5 border-l border-line">
-                    <div id="liveClock" class="text-base sm:text-lg font-bold text-amber-300 leading-none font-mono">08:35:00 PM</div>
+                    <div id="liveClock" class="text-base sm:text-lg font-bold text-amber-300 leading-none font-mono">09:10:00 PM</div>
                     <div id="liveDate" class="text-[10px] font-semibold tracking-wider text-slate-400 uppercase mt-1">THU, NOV 19, 2026</div>
                 </div>
             </div>
@@ -185,8 +185,8 @@
 
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
                 <div class="lg:col-span-6">
-                    <textarea id="quickTidStatusInput" rows="2"
-                        placeholder="18004252&#10;18003727 done&#10;18035004 terminal not found"
+                    <textarea id="quickTidStatusInput" rows="2" oninput="handleQuickInputPreview()"
+                        placeholder="Search/enter TIDs (e.g. 18004252 or 18003727 done or 18035004 terminal not found) to preview..."
                         class="w-full bg-elevated border border-line focus:border-amber-300 rounded-lg px-3 py-2 text-xs font-mono text-slate-100 placeholder-slate-400 outline-none resize-none"></textarea>
                 </div>
 
@@ -194,7 +194,7 @@
                     <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-300 mb-1">
                         Engineer (ROLL OUT BY)
                     </label>
-                    <select id="rolloutPanelEngineerSelect"
+                    <select id="rolloutPanelEngineerSelect" onchange="syncDefaultsIntoPreview()"
                         class="w-full bg-elevated border border-line focus:border-amber-300 rounded-lg px-2.5 py-2 text-xs text-white outline-none">
                     </select>
                 </div>
@@ -203,12 +203,12 @@
                     <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-300 mb-1">
                         Date (ROLL OUT DATE)
                     </label>
-                    <input id="rolloutPanelDatePicker" type="date"
+                    <input id="rolloutPanelDatePicker" type="date" onchange="syncDefaultsIntoPreview()"
                         class="w-full bg-elevated border border-line focus:border-amber-300 rounded-lg px-2.5 py-2 text-xs text-white outline-none">
                 </div>
 
                 <div class="lg:col-span-2 flex items-center gap-2">
-                    <label id="rolloutSheetLabel" title="Upload Rollout Excel/CSV to match LIVE TIDs and preview/edit before upload"
+                    <label id="rolloutSheetLabel" title="Upload Rollout Excel/CSV to filter & preview only matching LIVE TIDs"
                         class="bg-elevated hover:bg-slate-800 text-amber-200 border border-amber-300/35 px-2.5 py-2 rounded-lg text-xs font-semibold cursor-pointer flex-1 text-center truncate transition">
                         <i class="fa-solid fa-file-excel mr-1 text-amber-300"></i><span id="rolloutSheetBtnText">Sheet</span>
                         <input id="rolloutPanelFileInput" type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleRolloutSheetPreview(event)">
@@ -221,13 +221,13 @@
                 </div>
             </div>
 
-            <!-- Live Match Preview & Editable Staging Table for Sheet Input -->
+            <!-- Live Match Preview & Editable Staging Table for Search/Input & Sheet -->
             <div id="rolloutPreviewBox" class="hidden bg-surface/90 border border-amber-300/35 rounded-xl p-3.5 space-y-3">
                 <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 border-b border-line pb-2.5">
                     <div class="space-y-0.5">
                         <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-teal-300">
                             <i class="fa-solid fa-table-list text-amber-300"></i>
-                            <span>Sheet → LIVE TID Match Preview & Manual Edit</span>
+                            <span>LIVE TID Match Preview & Manual Edit (Only Matched LIVE TIDs Shown & Updated)</span>
                         </div>
                         <p id="rolloutPreviewSummary" class="text-xs text-slate-300"></p>
                     </div>
@@ -238,7 +238,7 @@
                         </button>
                         <button onclick="clearRolloutPreview()"
                             class="bg-elevated hover:bg-slate-800 text-rose-300 border border-rose-400/35 px-3 py-1.5 rounded-lg text-xs font-semibold transition">
-                            <i class="fa-solid fa-xmark mr-1"></i> Discard Preview
+                            <i class="fa-solid fa-xmark mr-1"></i> Clear Preview
                         </button>
                         <button onclick="applyQuickRolloutUpdate()"
                             class="bg-teal-300 hover:bg-teal-200 text-slate-950 font-bold px-4 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition">
@@ -467,6 +467,8 @@
         let bankMatchedRows = [];
         let bankMatchActive = false;
         let rolloutPreviewRows = [];
+        let lastSheetTotalRows = 0;
+        let lastSheetUnmatchedCount = 0;
         let currentDataset = 'LIVE';
         let selectedVersion = 'ALL';
         let activeAppVersion = localStorage.getItem('pos_active_app_version') || '43';
@@ -545,7 +547,6 @@
             );
         }
 
-        // If only TID is given without status, treat it as 'Done'
         function parseTidStatusLines(rawText) {
             const map = new Map();
             const lines = String(rawText || '').split(/\r?\n/);
@@ -1000,6 +1001,76 @@
             return liveRows.find(r => getTidFromRow(r) === clean || getOldTidFromRow(r) === clean) || null;
         }
 
+        function buildPreviewRowFromTidStatus(tidUpper, statusText, defaultEng, defaultDateIso) {
+            const liveMatch = findLiveRowByTid(tidUpper);
+            const cfgDate = liveMatch ? getCell(liveMatch, 'CONFIG DATE') : '';
+            return {
+                tid: tidUpper,
+                matched: Boolean(liveMatch),
+                merchantLabel: liveMatch
+                    ? (getCell(liveMatch, 'MERCHANT NAME') || getCell(liveMatch, 'DBA NAME') || 'Live Terminal')
+                    : 'Not found in LIVE',
+                status: normalizeCaseText(statusText || 'Done') || 'Done',
+                specialFunctionality: liveMatch ? getCell(liveMatch, 'SPECIAL FUNCTIONALITY') : '',
+                rollOutDate: formatChosenDate(defaultDateIso, cfgDate),
+                rollOutBy: defaultEng,
+                qr: liveMatch ? getCell(liveMatch, 'QR') : '',
+                limit: liveMatch ? getCell(liveMatch, 'LIMIT') : ''
+            };
+        }
+
+        function handleQuickInputPreview() {
+            const fileInput = document.getElementById('rolloutPanelFileInput');
+            if (fileInput && fileInput.files && fileInput.files[0]) return;
+
+            lastSheetTotalRows = 0;
+            lastSheetUnmatchedCount = 0;
+
+            const rawText = document.getElementById('quickTidStatusInput').value;
+            const parsedMap = parseTidStatusLines(rawText);
+            if (parsedMap.size === 0) {
+                rolloutPreviewRows = [];
+                renderRolloutPreviewTable();
+                return;
+            }
+
+            const defaultEng = document.getElementById('rolloutPanelEngineerSelect').value;
+            const defaultDateIso = document.getElementById('rolloutPanelDatePicker').value;
+
+            const existingByTid = new Map();
+            rolloutPreviewRows.forEach(r => {
+                if (r.tid) existingByTid.set(r.tid.toUpperCase(), r);
+            });
+
+            const nextRows = [];
+            parsedMap.forEach((stVal, tidKey) => {
+                const prev = existingByTid.get(tidKey);
+                if (prev) {
+                    prev.status = normalizeCaseText(stVal || 'Done') || 'Done';
+                    nextRows.push(prev);
+                } else {
+                    nextRows.push(buildPreviewRowFromTidStatus(tidKey, stVal, defaultEng, defaultDateIso));
+                }
+            });
+
+            rolloutPreviewRows = nextRows;
+            renderRolloutPreviewTable();
+        }
+
+        function syncDefaultsIntoPreview() {
+            if (!rolloutPreviewRows || rolloutPreviewRows.length === 0) return;
+            const defaultEng = document.getElementById('rolloutPanelEngineerSelect').value;
+            const defaultDateIso = document.getElementById('rolloutPanelDatePicker').value;
+            rolloutPreviewRows.forEach(item => {
+                if (!item.rollOutBy) item.rollOutBy = defaultEng;
+                if (!item.rollOutDate) {
+                    const liveMatch = findLiveRowByTid(item.tid);
+                    item.rollOutDate = formatChosenDate(defaultDateIso, liveMatch ? getCell(liveMatch, 'CONFIG DATE') : '');
+                }
+            });
+            renderRolloutPreviewTable();
+        }
+
         function buildPreviewRowFromExcel(rr, defaultEng, defaultDateIso) {
             const tidRaw = (getCell(rr, 'TID') || getCell(rr, 'TERMINAL ID') || '').trim();
             const tidUpper = tidRaw.toUpperCase();
@@ -1095,11 +1166,15 @@
                 return acc + miss;
             }, 0);
 
+            const sheetFilterNote = lastSheetTotalRows > 0
+                ? ` (Filtered from <strong class="text-purple-300">${lastSheetTotalRows}</strong> Excel rows • <strong class="text-slate-400">${lastSheetUnmatchedCount}</strong> unmatched skipped)`
+                : '';
+
             summary.innerHTML =
-                `Total <strong class="text-white">${rolloutPreviewRows.length}</strong> rows • ` +
+                `Showing <strong class="text-white">${rolloutPreviewRows.length}</strong> row(s)${sheetFilterNote} • ` +
                 `<strong class="text-teal-300">${matchedCount} Matched in LIVE</strong> • ` +
                 `<strong class="${missingCount > 0 ? 'text-rose-300' : 'text-slate-400'}">${missingCount} Not in LIVE</strong> • ` +
-                `<strong class="${missingFieldsCount > 0 ? 'text-amber-300' : 'text-teal-300'}">${missingFieldsCount} Blank/Missing Field(s)</strong> (edit directly below before clicking <strong>Upload to LIVE</strong>)`;
+                `<strong class="${missingFieldsCount > 0 ? 'text-amber-300' : 'text-teal-300'}">${missingFieldsCount} Blank/Missing Field(s)</strong> (edit below if needed, then click <strong>Upload to LIVE</strong>)`;
 
             const engOptionsHtml = engineers.map(e => `<option value="${e}">${e}</option>`).join('');
 
@@ -1173,6 +1248,7 @@
             const cleanTid = String(val || '').trim().toUpperCase();
             rolloutPreviewRows[idx].tid = cleanTid;
             const liveMatch = findLiveRowByTid(cleanTid);
+            rolloutPreviewRows[idx].matched = Boolean(liveMatch);
             if (liveMatch) {
                 if (!rolloutPreviewRows[idx].specialFunctionality) {
                     rolloutPreviewRows[idx].specialFunctionality = getCell(liveMatch, 'SPECIAL FUNCTIONALITY');
@@ -1211,6 +1287,8 @@
 
         function clearRolloutPreview() {
             rolloutPreviewRows = [];
+            lastSheetTotalRows = 0;
+            lastSheetUnmatchedCount = 0;
             const fileInput = document.getElementById('rolloutPanelFileInput');
             if (fileInput) fileInput.value = '';
             document.getElementById('rolloutSheetBtnText').textContent = 'Sheet';
@@ -1218,6 +1296,7 @@
             showToast('Rollout preview cleared');
         }
 
+        // Only keep & show Excel rows whose TID matches LIVE terminals
         async function handleRolloutSheetPreview(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -1231,36 +1310,28 @@
                 return;
             }
 
-            const defaultEng = document.getElementById('rolloutPanelEngineerSelect').value;
-            const defaultDateIso = document.getElementById('rolloutPanelDatePicker').value;
-
             let firstMatchedEngineer = '';
             let firstDateIso = '';
-            const lineEntries = [];
+            const matchedLineEntries = [];
 
-            rRows.forEach(rr => {
-                const engVal = (getCell(rr, 'ROLL OUT BY') || getCell(rr, 'ROLLOUT BY') || getCell(rr, 'ENGINEER') || '').trim();
-                const dateVal = (getCell(rr, 'ROLL OUT DATE') || getCell(rr, 'ROLLOUT DATE') || getCell(rr, 'DATE') || '').trim();
-                const tidVal = (getCell(rr, 'TID') || getCell(rr, 'TERMINAL ID') || '').trim();
-                const statusVal = normalizeCaseText(
-                    getCell(rr, 'STATUS') ||
-                    getCell(rr, 'REMARKS (IF ANY)') ||
-                    getCell(rr, 'REMARKS') ||
-                    getCell(rr, 'NW OS/ PROFILE DATE') ||
-                    'Done'
-                ) || 'Done';
+            const activeEngInitial = document.getElementById('rolloutPanelEngineerSelect').value;
+            const activeIsoInitial = document.getElementById('rolloutPanelDatePicker').value;
 
-                if (!firstMatchedEngineer && engVal) {
-                    const matched = detectEngineerFromFixedList(engVal);
-                    if (matched) firstMatchedEngineer = matched;
+            const allBuilt = rRows.map(rr => buildPreviewRowFromExcel(rr, activeEngInitial, activeIsoInitial));
+            const onlyMatchedInLive = allBuilt.filter(item => item.tid && item.matched);
+
+            lastSheetTotalRows = rRows.length;
+            lastSheetUnmatchedCount = Math.max(0, rRows.length - onlyMatchedInLive.length);
+
+            onlyMatchedInLive.forEach(item => {
+                if (!firstMatchedEngineer && item.rollOutBy && engineers.includes(item.rollOutBy)) {
+                    firstMatchedEngineer = item.rollOutBy;
                 }
-                if (!firstDateIso && dateVal) {
-                    const iso = parseAnyDateToIso(dateVal);
+                if (!firstDateIso && item.rollOutDate) {
+                    const iso = parseAnyDateToIso(item.rollOutDate);
                     if (iso) firstDateIso = iso;
                 }
-                if (tidVal) {
-                    lineEntries.push(statusVal.toLowerCase() === 'done' ? tidVal : `${tidVal} ${statusVal}`);
-                }
+                matchedLineEntries.push(item.status.toLowerCase() === 'done' ? item.tid : `${item.tid} ${item.status}`);
             });
 
             if (firstMatchedEngineer) {
@@ -1269,19 +1340,16 @@
             if (firstDateIso) {
                 document.getElementById('rolloutPanelDatePicker').value = firstDateIso;
             }
-            if (lineEntries.length > 0) {
-                document.getElementById('quickTidStatusInput').value = lineEntries.join('\n');
-            }
+            document.getElementById('quickTidStatusInput').value = matchedLineEntries.join('\n');
 
-            const activeEng = document.getElementById('rolloutPanelEngineerSelect').value;
-            const activeIso = document.getElementById('rolloutPanelDatePicker').value;
-
-            rolloutPreviewRows = rRows
-                .map(rr => buildPreviewRowFromExcel(rr, activeEng, activeIso))
-                .filter(p => p.tid || p.specialFunctionality || p.qr || p.limit);
-
+            rolloutPreviewRows = onlyMatchedInLive;
             renderRolloutPreviewTable();
-            showToast(`Matched ${rolloutPreviewRows.length} rows against LIVE TIDs. Review or edit, then click Upload.`);
+
+            if (onlyMatchedInLive.length === 0) {
+                showToast(`0 matching LIVE TIDs found in "${file.name}"`);
+            } else {
+                showToast(`Found ${onlyMatchedInLive.length} matching LIVE TIDs out of ${rRows.length} rows. Review & click Upload.`);
+            }
         }
 
         async function applyQuickRolloutUpdate() {
@@ -1290,10 +1358,9 @@
             const rawLines = document.getElementById('quickTidStatusInput').value;
             const fileInput = document.getElementById('rolloutPanelFileInput');
 
-            const tidStatusMap = parseTidStatusLines(rawLines);
+            const tidStatusMap = new Map();
             const sheetDetailsMap = new Map();
 
-            // If user edited or loaded preview rows from Sheet, prioritize those edited values
             if (rolloutPreviewRows && rolloutPreviewRows.length > 0) {
                 rolloutPreviewRows.forEach(pr => {
                     const tid = String(pr.tid || '').trim().toUpperCase();
@@ -1315,14 +1382,17 @@
                 const rRows = parseSheetRows(wb);
                 rRows.forEach(rr => {
                     const pr = buildPreviewRowFromExcel(rr, defaultEng, defaultDateIso);
-                    if (!pr.tid) return;
+                    if (!pr.tid || !pr.matched) return;
                     tidStatusMap.set(pr.tid, pr.status);
                     sheetDetailsMap.set(pr.tid, pr);
                 });
+            } else {
+                const parsed = parseTidStatusLines(rawLines);
+                parsed.forEach((st, tid) => tidStatusMap.set(tid, st));
             }
 
             if (tidStatusMap.size === 0) {
-                showToast('Enter or paste TIDs or upload a Sheet first');
+                showToast('No matching LIVE TIDs ready to upload');
                 return;
             }
 
@@ -1330,10 +1400,12 @@
 
             liveRows.forEach(row => {
                 const tid = getCell(row, 'TID').toUpperCase();
-                if (!tidStatusMap.has(tid)) return;
+                const oldTid = getCell(row, 'OLD TID').toUpperCase();
+                const matchedKey = tidStatusMap.has(tid) ? tid : (tidStatusMap.has(oldTid) ? oldTid : '');
+                if (!matchedKey) return;
 
-                const sDet = sheetDetailsMap.get(tid);
-                const rawStatus = sDet ? sDet.status : tidStatusMap.get(tid);
+                const sDet = sheetDetailsMap.get(matchedKey);
+                const rawStatus = sDet ? sDet.status : tidStatusMap.get(matchedKey);
                 const statusText = normalizeCaseText(rawStatus || 'Done');
                 const isDoneStatus = statusText.toLowerCase() === 'done';
 
@@ -1369,12 +1441,14 @@
             });
 
             rolloutPreviewRows = [];
+            lastSheetTotalRows = 0;
+            lastSheetUnmatchedCount = 0;
             renderRolloutPreviewTable();
             fileInput.value = '';
             document.getElementById('rolloutSheetBtnText').textContent = 'Sheet';
             refreshAllUI();
             pushUpdatesToGoogleSheet('Rollout Update');
-            showToast(`Uploaded ${updatedCount} TIDs to LIVE & synced to Google Sheet [Ver ${activeAppVersion}]`);
+            showToast(`Uploaded ${updatedCount} matched TIDs to LIVE & synced [Ver ${activeAppVersion}]`);
         }
 
         // Bank Mail Excel -> Find matching TIDs from LIVE terminals & export
