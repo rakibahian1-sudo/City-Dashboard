@@ -95,7 +95,7 @@
                 </label>
 
                 <div class="text-right pl-2.5 border-l border-line">
-                    <div id="liveClock" class="text-base sm:text-lg font-bold text-amber-300 leading-none font-mono">05:04:00 PM</div>
+                    <div id="liveClock" class="text-base sm:text-lg font-bold text-amber-300 leading-none font-mono">08:35:00 PM</div>
                     <div id="liveDate" class="text-[10px] font-semibold tracking-wider text-slate-400 uppercase mt-1">THU, NOV 19, 2026</div>
                 </div>
             </div>
@@ -172,21 +172,21 @@
         </section>
 
         <!-- TID + STATUS ROLLOUT UPDATE -->
-        <section class="glass-card rounded-xl p-4 space-y-3">
+        <section class="glass-card rounded-xl p-4 space-y-4">
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <div class="flex items-center gap-2 text-xs font-bold tracking-wider text-amber-300 uppercase">
                     <i class="fa-solid fa-list-check"></i>
                     <span>TID + STATUS ROLLOUT UPDATE</span>
                 </div>
                 <span class="text-[11px] text-slate-400">
-                    <strong class="text-teal-300">NW OS/ PROFILE DATE</strong> → <code class="text-teal-300">Done</code> • Status → <strong class="text-amber-300">REMARKS (IF ANY)</strong> • App Version: <strong class="text-purple-300" id="panelVerBadge">43</strong>
+                    TID only (e.g. <code class="text-teal-300">18004252</code>) → <strong class="text-teal-300">Done</strong> • <code class="text-teal-300">Done</code> → <strong class="text-teal-300">NW OS/ PROFILE DATE</strong> • Non-Done → <strong class="text-amber-300">REMARKS (IF ANY)</strong> • App Version: <strong class="text-purple-300" id="panelVerBadge">43</strong>
                 </span>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
                 <div class="lg:col-span-6">
                     <textarea id="quickTidStatusInput" rows="2"
-                        placeholder="18003727 done&#10;18012175 Done&#10;18035004 terminal not found"
+                        placeholder="18004252&#10;18003727 done&#10;18035004 terminal not found"
                         class="w-full bg-elevated border border-line focus:border-amber-300 rounded-lg px-3 py-2 text-xs font-mono text-slate-100 placeholder-slate-400 outline-none resize-none"></textarea>
                 </div>
 
@@ -208,14 +208,103 @@
                 </div>
 
                 <div class="lg:col-span-2 flex items-center gap-2">
-                    <label class="bg-elevated hover:bg-slate-800 text-amber-200 border border-amber-300/35 px-2.5 py-2 rounded-lg text-xs font-semibold cursor-pointer flex-1 text-center truncate transition">
-                        <i class="fa-solid fa-file-excel mr-1 text-amber-300"></i>Sheet
-                        <input id="rolloutPanelFileInput" type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleRolloutSheetAutoFill(event)">
+                    <label id="rolloutSheetLabel" title="Upload Rollout Excel/CSV to match LIVE TIDs and preview/edit before upload"
+                        class="bg-elevated hover:bg-slate-800 text-amber-200 border border-amber-300/35 px-2.5 py-2 rounded-lg text-xs font-semibold cursor-pointer flex-1 text-center truncate transition">
+                        <i class="fa-solid fa-file-excel mr-1 text-amber-300"></i><span id="rolloutSheetBtnText">Sheet</span>
+                        <input id="rolloutPanelFileInput" type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleRolloutSheetPreview(event)">
                     </label>
                     <button onclick="applyQuickRolloutUpdate()"
                         class="bg-amber-300 hover:bg-amber-200 text-slate-950 font-bold px-3.5 py-2 rounded-lg text-xs flex items-center gap-1.5 transition shrink-0">
-                        <i class="fa-solid fa-check"></i>
-                        <span>Update</span>
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                        <span>Upload</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Live Match Preview & Editable Staging Table for Sheet Input -->
+            <div id="rolloutPreviewBox" class="hidden bg-surface/90 border border-amber-300/35 rounded-xl p-3.5 space-y-3">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 border-b border-line pb-2.5">
+                    <div class="space-y-0.5">
+                        <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-teal-300">
+                            <i class="fa-solid fa-table-list text-amber-300"></i>
+                            <span>Sheet → LIVE TID Match Preview & Manual Edit</span>
+                        </div>
+                        <p id="rolloutPreviewSummary" class="text-xs text-slate-300"></p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button onclick="addManualRolloutPreviewRow()"
+                            class="bg-elevated hover:bg-slate-800 text-teal-200 border border-teal-300/40 px-3 py-1.5 rounded-lg text-xs font-semibold transition">
+                            <i class="fa-solid fa-plus mr-1"></i> Add TID Row
+                        </button>
+                        <button onclick="clearRolloutPreview()"
+                            class="bg-elevated hover:bg-slate-800 text-rose-300 border border-rose-400/35 px-3 py-1.5 rounded-lg text-xs font-semibold transition">
+                            <i class="fa-solid fa-xmark mr-1"></i> Discard Preview
+                        </button>
+                        <button onclick="applyQuickRolloutUpdate()"
+                            class="bg-teal-300 hover:bg-teal-200 text-slate-950 font-bold px-4 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-upload"></i>
+                            <span>Upload to LIVE</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto max-h-80 rounded-lg border border-line">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead class="bg-elevated text-amber-200 uppercase text-[10px] tracking-wider sticky top-0 z-10">
+                            <tr>
+                                <th class="py-2 px-2.5 border-b border-line">MATCH STATUS</th>
+                                <th class="py-2 px-2.5 border-b border-line">TID</th>
+                                <th class="py-2 px-2.5 border-b border-line">MERCHANT / LIVE INFO</th>
+                                <th class="py-2 px-2.5 border-b border-line">STATUS (Done / Remarks)</th>
+                                <th class="py-2 px-2.5 border-b border-line">SPECIAL FUNCTIONALITY</th>
+                                <th class="py-2 px-2.5 border-b border-line">ROLL OUT DATE</th>
+                                <th class="py-2 px-2.5 border-b border-line">ROLL OUT BY</th>
+                                <th class="py-2 px-2.5 border-b border-line">QR</th>
+                                <th class="py-2 px-2.5 border-b border-line">LIMIT</th>
+                                <th class="py-2 px-2.5 border-b border-line text-center">REMOVE</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rolloutPreviewTbody" class="divide-y divide-line/60 bg-obsidian/70"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- BANK MAIL EXCEL -> LIVE TID MATCH & EXPORT -->
+        <section class="glass-card rounded-xl p-4 space-y-3 border border-purple-400/30">
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                <div class="space-y-1">
+                    <div class="flex items-center gap-2 text-xs font-bold tracking-wider text-purple-300 uppercase">
+                        <i class="fa-solid fa-envelope-open-text text-amber-300"></i>
+                        <span>BANK MAIL EXCEL → LIVE TID FINDER & EXPORT</span>
+                    </div>
+                    <p id="bankMatchSummary" class="text-xs text-slate-400">
+                        Upload the Excel/CSV file received from bank mail to find matching TIDs from <strong class="text-teal-300">LIVE TERMINALS</strong> and export them for work.
+                    </p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <label class="bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 border border-purple-400/45 px-3.5 py-2 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-file-import"></i>
+                        <span>Upload Bank Excel</span>
+                        <input id="bankExcelInput" type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleBankExcelMatch(event)">
+                    </label>
+
+                    <button onclick="exportBankMatched('csv')" id="exportBankCsvBtn" disabled
+                        class="bg-teal-400/20 hover:bg-teal-400/30 disabled:opacity-40 text-teal-200 border border-teal-300/45 px-3.5 py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-file-csv"></i>
+                        <span>Export Matched CSV</span>
+                    </button>
+
+                    <button onclick="exportBankMatched('xlsx')" id="exportBankXlsxBtn" disabled
+                        class="bg-amber-300 hover:bg-amber-200 disabled:opacity-40 text-slate-950 px-3.5 py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-file-excel"></i>
+                        <span>Export Matched Excel</span>
+                    </button>
+
+                    <button onclick="clearBankMatchFilter()" id="clearBankMatchBtn"
+                        class="bg-elevated hover:bg-slate-800 text-rose-300 border border-rose-400/35 px-3 py-2 rounded-lg text-xs font-semibold transition">
+                        <i class="fa-solid fa-xmark mr-1"></i> Clear Filter
                     </button>
                 </div>
             </div>
@@ -254,7 +343,7 @@
                         <span>EXPORT</span>
                     </button>
 
-                    <!-- Engineer Filter with ALL ENGINEER Option -->
+                    <!-- Engineer Filter with Fixed List + ALL ENGINEER Option -->
                     <div class="flex items-center gap-1.5 bg-elevated border border-line rounded-lg px-2 py-1">
                         <span class="text-[10px] font-bold uppercase tracking-wider text-purple-300 px-1">ENGINEERS:</span>
                         <select id="engineerSelect" onchange="applyFilters()" class="bg-surface border border-line rounded px-2 py-1 text-xs text-white outline-none">
@@ -375,6 +464,9 @@
         let liveRows = [];
         let withdrawnRows = [];
         let filteredRows = [];
+        let bankMatchedRows = [];
+        let bankMatchActive = false;
+        let rolloutPreviewRows = [];
         let currentDataset = 'LIVE';
         let selectedVersion = 'ALL';
         let activeAppVersion = localStorage.getItem('pos_active_app_version') || '43';
@@ -436,7 +528,7 @@
         }
 
         function getTidFromRow(row) {
-            return normKey(getCell(row, 'TID') || getCell(row, 'TERMINAL ID') || '');
+            return normKey(getCell(row, 'TID') || getCell(row, 'TERMINAL ID') || getCell(row, 'TID NO') || '');
         }
 
         function getOldTidFromRow(row) {
@@ -453,6 +545,7 @@
             );
         }
 
+        // If only TID is given without status, treat it as 'Done'
         function parseTidStatusLines(rawText) {
             const map = new Map();
             const lines = String(rawText || '').split(/\r?\n/);
@@ -460,7 +553,7 @@
                 const trimmed = line.trim();
                 if (!trimmed) return;
                 const match = trimmed.match(/^(\S+)\s+(.+)$/);
-                if (match) {
+                if (match && match[2].trim()) {
                     const tid = match[1].trim().toUpperCase();
                     const statusNormalized = normalizeCaseText(match[2]);
                     if (tid) map.set(tid, statusNormalized);
@@ -532,33 +625,11 @@
             document.getElementById('rolloutPanelDatePicker').value = `${y}-${m}-${d}`;
         }
 
-        function autoDetectEngineersFromRows(rows) {
-            if (!rows || rows.length === 0) return 0;
-            let addedCount = 0;
-            const existingLower = new Set(engineers.map(e => e.toLowerCase()));
-
-            rows.forEach(r => {
-                const rawName = (
-                    getCell(r, 'ROLL OUT BY') ||
-                    getCell(r, 'ROLLOUT BY') ||
-                    getCell(r, 'ENGINEER') ||
-                    ''
-                ).trim();
-                if (!rawName) return;
-                const cleanName = rawName.replace(/\s+/g, ' ');
-                const key = cleanName.toLowerCase();
-                if (!existingLower.has(key) && key !== '-' && key !== 'na' && key !== 'n/a' && key !== 'all engineer') {
-                    engineers.push(cleanName);
-                    existingLower.add(key);
-                    addedCount++;
-                }
-            });
-
-            if (addedCount > 0) {
-                localStorage.setItem('pos_engineers_list', JSON.stringify(engineers));
-            }
-            renderEngineerDropdowns();
-            return addedCount;
+        function detectEngineerFromFixedList(rawName) {
+            const clean = String(rawName || '').trim().replace(/\s+/g, ' ');
+            if (!clean) return '';
+            const matched = engineers.find(e => e.toLowerCase() === clean.toLowerCase());
+            return matched || '';
         }
 
         function saveEngineers() {
@@ -711,9 +782,15 @@
             if (!matrix || matrix.length === 0) return [];
 
             let headerRowIdx = 0;
-            for (let i = 0; i < Math.min(5, matrix.length); i++) {
+            for (let i = 0; i < Math.min(8, matrix.length); i++) {
                 const rowUpper = matrix[i].map(c => String(c || '').trim().toUpperCase());
-                if (rowUpper.includes('TID') || rowUpper.includes('MERCHANT NAME') || rowUpper.includes('SL.') || rowUpper.includes('POS SERIAL')) {
+                if (
+                    rowUpper.includes('TID') ||
+                    rowUpper.includes('TERMINAL ID') ||
+                    rowUpper.includes('MERCHANT NAME') ||
+                    rowUpper.includes('SL.') ||
+                    rowUpper.includes('POS SERIAL')
+                ) {
                     headerRowIdx = i;
                     break;
                 }
@@ -786,7 +863,6 @@
                         withdrawnRows = data.withdrawn;
                     }
                     mergeHeadersFromRows(liveRows.concat(withdrawnRows));
-                    autoDetectEngineersFromRows(liveRows.concat(withdrawnRows));
                     refreshAllUI();
                     statusEl.textContent = 'LIVE SYNCED';
                     if (showNotice) showToast(`Synced ${liveRows.length} live & ${withdrawnRows.length} withdrawn rows`);
@@ -796,7 +872,6 @@
                     const wb = XLSX.read(csvText, { type: 'string', raw: false });
                     liveRows = parseSheetRows(wb);
                     mergeHeadersFromRows(liveRows);
-                    autoDetectEngineersFromRows(liveRows);
                     refreshAllUI();
                     statusEl.textContent = 'CSV SYNCED';
                     if (showNotice) showToast(`Synced ${liveRows.length} rows from Google Sheet`);
@@ -817,11 +892,9 @@
                 const wb = readWorkbookFromBuffer(e.target.result);
                 liveRows = parseSheetRows(wb);
                 mergeHeadersFromRows(liveRows);
-                const detectedEng = autoDetectEngineersFromRows(liveRows);
                 refreshAllUI();
                 pushUpdatesToGoogleSheet('Master Upload');
-                const extra = detectedEng > 0 ? ` • ${detectedEng} new engineers detected` : '';
-                showToast(`Loaded ${liveRows.length} live records & synced to Google Sheet${extra}`);
+                showToast(`Loaded ${liveRows.length} live records & synced to Google Sheet`);
             };
             reader.readAsArrayBuffer(file);
         }
@@ -840,7 +913,6 @@
                 });
                 withdrawnRows = withdrawnRows.concat(uploaded);
                 mergeHeadersFromRows(withdrawnRows);
-                autoDetectEngineersFromRows(uploaded);
                 refreshAllUI();
                 pushUpdatesToGoogleSheet('Withdrawn Upload');
                 showToast(`Added ${uploaded.length} records to Withdrawn & synced`);
@@ -861,9 +933,7 @@
                 }
 
                 mergeHeadersFromRows(dailyRows);
-                const detectedEng = autoDetectEngineersFromRows(dailyRows);
 
-                // Collect TID, OLD TID, and POS SERIAL from newly uploaded Daily Excel
                 const dailyTids = new Set();
                 const dailyOldTids = new Set();
                 const dailyPosSerials = new Set();
@@ -891,7 +961,6 @@
                 const remainingLive = [];
                 let movedToWithdrawn = 0;
 
-                // Check OLD TID, TID, and POS SERIAL duplicates in old live rows and move duplicates to WITHDRAWN
                 liveRows.forEach(lRow => {
                     const lTid = getTidFromRow(lRow);
                     const lOldTid = getOldTidFromRow(lRow);
@@ -920,15 +989,240 @@
                 liveRows = remainingLive.concat(preparedDaily);
                 refreshAllUI();
                 pushUpdatesToGoogleSheet('Daily Excel');
-                const extra = detectedEng > 0 ? ` • ${detectedEng} new engineers detected` : '';
-                showToast(`Duplicate check done: ${movedToWithdrawn} moved to Withdrawn, ${preparedDaily.length} added to Live & synced${extra}`);
+                showToast(`Duplicate check done: ${movedToWithdrawn} moved to Withdrawn, ${preparedDaily.length} added to Live & synced`);
             };
             reader.readAsArrayBuffer(file);
         }
 
-        async function handleRolloutSheetAutoFill(event) {
+        function findLiveRowByTid(tidUpper) {
+            const clean = String(tidUpper || '').trim().toUpperCase();
+            if (!clean) return null;
+            return liveRows.find(r => getTidFromRow(r) === clean || getOldTidFromRow(r) === clean) || null;
+        }
+
+        function buildPreviewRowFromExcel(rr, defaultEng, defaultDateIso) {
+            const tidRaw = (getCell(rr, 'TID') || getCell(rr, 'TERMINAL ID') || '').trim();
+            const tidUpper = tidRaw.toUpperCase();
+            const liveMatch = findLiveRowByTid(tidUpper);
+
+            const specialFunc = (
+                getCell(rr, 'SPECIAL FUNCTIONALITY') ||
+                getCell(rr, 'SPECIAL_FUNCTIONALITY') ||
+                getCell(rr, 'FEATURE') ||
+                (liveMatch ? getCell(liveMatch, 'SPECIAL FUNCTIONALITY') : '') ||
+                ''
+            ).trim();
+
+            const rollDateRaw = (
+                getCell(rr, 'ROLL OUT DATE') ||
+                getCell(rr, 'ROLLOUT DATE') ||
+                getCell(rr, 'DATE') ||
+                ''
+            ).trim();
+
+            const engRaw = (
+                getCell(rr, 'ROLL OUT BY') ||
+                getCell(rr, 'ROLLOUT BY') ||
+                getCell(rr, 'ENGINEER') ||
+                ''
+            ).trim();
+
+            const qrRaw = (
+                getCell(rr, 'QR') ||
+                (liveMatch ? getCell(liveMatch, 'QR') : '') ||
+                ''
+            ).trim();
+
+            const limitRaw = (
+                getCell(rr, 'LIMIT') ||
+                (liveMatch ? getCell(liveMatch, 'LIMIT') : '') ||
+                ''
+            ).trim();
+
+            const statusRaw = (
+                getCell(rr, 'STATUS') ||
+                getCell(rr, 'REMARKS (IF ANY)') ||
+                getCell(rr, 'REMARKS') ||
+                getCell(rr, 'NW OS/ PROFILE DATE') ||
+                'Done'
+            ).trim();
+
+            const matchedEng = detectEngineerFromFixedList(engRaw);
+            const parsedIso = parseAnyDateToIso(rollDateRaw);
+            const cfgDate = liveMatch ? getCell(liveMatch, 'CONFIG DATE') : '';
+            const formattedDate = rollDateRaw && !parsedIso
+                ? rollDateRaw
+                : formatChosenDate(parsedIso || defaultDateIso, cfgDate);
+
+            const merchantLabel = liveMatch
+                ? (getCell(liveMatch, 'MERCHANT NAME') || getCell(liveMatch, 'DBA NAME') || 'Live Terminal')
+                : 'Not found in LIVE';
+
+            return {
+                tid: tidUpper,
+                matched: Boolean(liveMatch),
+                merchantLabel,
+                status: normalizeCaseText(statusRaw || 'Done') || 'Done',
+                specialFunctionality: specialFunc,
+                rollOutDate: formattedDate,
+                rollOutBy: matchedEng || defaultEng,
+                qr: qrRaw ? normalizeCaseText(qrRaw) : '',
+                limit: limitRaw
+            };
+        }
+
+        function renderRolloutPreviewTable() {
+            const box = document.getElementById('rolloutPreviewBox');
+            const tbody = document.getElementById('rolloutPreviewTbody');
+            const summary = document.getElementById('rolloutPreviewSummary');
+
+            if (!rolloutPreviewRows || rolloutPreviewRows.length === 0) {
+                box.classList.add('hidden');
+                tbody.innerHTML = '';
+                return;
+            }
+
+            box.classList.remove('hidden');
+            const matchedCount = rolloutPreviewRows.filter(r => findLiveRowByTid(r.tid)).length;
+            const missingCount = rolloutPreviewRows.length - matchedCount;
+            const missingFieldsCount = rolloutPreviewRows.reduce((acc, r) => {
+                let miss = 0;
+                if (!r.specialFunctionality) miss++;
+                if (!r.rollOutBy) miss++;
+                if (!r.rollOutDate) miss++;
+                if (!r.qr) miss++;
+                if (!r.limit) miss++;
+                return acc + miss;
+            }, 0);
+
+            summary.innerHTML =
+                `Total <strong class="text-white">${rolloutPreviewRows.length}</strong> rows • ` +
+                `<strong class="text-teal-300">${matchedCount} Matched in LIVE</strong> • ` +
+                `<strong class="${missingCount > 0 ? 'text-rose-300' : 'text-slate-400'}">${missingCount} Not in LIVE</strong> • ` +
+                `<strong class="${missingFieldsCount > 0 ? 'text-amber-300' : 'text-teal-300'}">${missingFieldsCount} Blank/Missing Field(s)</strong> (edit directly below before clicking <strong>Upload to LIVE</strong>)`;
+
+            const engOptionsHtml = engineers.map(e => `<option value="${e}">${e}</option>`).join('');
+
+            tbody.innerHTML = rolloutPreviewRows.map((item, idx) => {
+                const liveFound = findLiveRowByTid(item.tid);
+                const mLabel = liveFound
+                    ? (getCell(liveFound, 'MERCHANT NAME') || getCell(liveFound, 'DBA NAME') || 'Live Terminal')
+                    : 'Not found in LIVE';
+                const badgeClass = liveFound
+                    ? 'bg-teal-400/15 text-teal-300 border-teal-300/40'
+                    : 'bg-rose-500/20 text-rose-300 border-rose-400/45';
+                const badgeText = liveFound ? 'MATCHED' : 'NO LIVE TID';
+
+                const hasEngInList = engineers.includes(item.rollOutBy);
+                const selectHtml = hasEngInList
+                    ? `<select onchange="updatePreviewField(${idx}, 'rollOutBy', this.value)" class="bg-elevated border border-line rounded px-2 py-1 text-xs text-white w-28 outline-none">
+                        ${engineers.map(e => `<option value="${e}" ${e === item.rollOutBy ? 'selected' : ''}>${e}</option>`).join('')}
+                       </select>`
+                    : `<input type="text" value="${item.rollOutBy || ''}" placeholder="Engineer..." onchange="updatePreviewField(${idx}, 'rollOutBy', this.value)"
+                        class="bg-elevated border ${!item.rollOutBy ? 'border-amber-300/60' : 'border-line'} rounded px-2 py-1 text-xs text-white w-28 outline-none">`;
+
+                return `
+                    <tr class="hover:bg-elevated/40">
+                        <td class="py-2 px-2.5 whitespace-nowrap">
+                            <span class="px-2 py-0.5 rounded border text-[10px] font-bold ${badgeClass}">${badgeText}</span>
+                        </td>
+                        <td class="py-2 px-2.5 whitespace-nowrap">
+                            <input type="text" value="${item.tid || ''}" placeholder="TID..." onchange="updatePreviewTid(${idx}, this.value)"
+                                class="bg-elevated border ${!item.tid ? 'border-rose-400' : 'border-line'} rounded px-2 py-1 text-xs font-mono text-teal-200 w-24 outline-none">
+                        </td>
+                        <td class="py-2 px-2.5 max-w-[180px] truncate text-slate-300" title="${mLabel}">${mLabel}</td>
+                        <td class="py-2 px-2.5 whitespace-nowrap">
+                            <input type="text" value="${item.status || 'Done'}" onchange="updatePreviewField(${idx}, 'status', this.value)"
+                                class="bg-elevated border border-line rounded px-2 py-1 text-xs text-amber-200 w-28 outline-none">
+                        </td>
+                        <td class="py-2 px-2.5 whitespace-nowrap">
+                            <input type="text" value="${item.specialFunctionality || ''}" placeholder="Fill missing..." onchange="updatePreviewField(${idx}, 'specialFunctionality', this.value)"
+                                class="bg-elevated border ${!item.specialFunctionality ? 'border-amber-300/60' : 'border-line'} rounded px-2 py-1 text-xs text-white w-36 outline-none">
+                        </td>
+                        <td class="py-2 px-2.5 whitespace-nowrap">
+                            <input type="text" value="${item.rollOutDate || ''}" placeholder="MM/DD/YYYY" onchange="updatePreviewField(${idx}, 'rollOutDate', this.value)"
+                                class="bg-elevated border ${!item.rollOutDate ? 'border-amber-300/60' : 'border-line'} rounded px-2 py-1 text-xs text-white w-24 outline-none">
+                        </td>
+                        <td class="py-2 px-2.5 whitespace-nowrap">${selectHtml || engOptionsHtml}</td>
+                        <td class="py-2 px-2.5 whitespace-nowrap">
+                            <input type="text" value="${item.qr || ''}" placeholder="Yes / No" onchange="updatePreviewField(${idx}, 'qr', this.value)"
+                                class="bg-elevated border ${!item.qr ? 'border-amber-300/60' : 'border-line'} rounded px-2 py-1 text-xs text-white w-16 outline-none">
+                        </td>
+                        <td class="py-2 px-2.5 whitespace-nowrap">
+                            <input type="text" value="${item.limit || ''}" placeholder="Limit..." onchange="updatePreviewField(${idx}, 'limit', this.value)"
+                                class="bg-elevated border ${!item.limit ? 'border-amber-300/60' : 'border-line'} rounded px-2 py-1 text-xs text-white w-20 outline-none">
+                        </td>
+                        <td class="py-2 px-2.5 text-center whitespace-nowrap">
+                            <button onclick="removePreviewRow(${idx})" title="Remove row" class="text-rose-300 hover:text-rose-200 px-1.5 py-1">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function updatePreviewField(idx, field, val) {
+            if (!rolloutPreviewRows[idx]) return;
+            rolloutPreviewRows[idx][field] = String(val || '').trim();
+            renderRolloutPreviewTable();
+        }
+
+        function updatePreviewTid(idx, val) {
+            if (!rolloutPreviewRows[idx]) return;
+            const cleanTid = String(val || '').trim().toUpperCase();
+            rolloutPreviewRows[idx].tid = cleanTid;
+            const liveMatch = findLiveRowByTid(cleanTid);
+            if (liveMatch) {
+                if (!rolloutPreviewRows[idx].specialFunctionality) {
+                    rolloutPreviewRows[idx].specialFunctionality = getCell(liveMatch, 'SPECIAL FUNCTIONALITY');
+                }
+                if (!rolloutPreviewRows[idx].qr) {
+                    rolloutPreviewRows[idx].qr = getCell(liveMatch, 'QR');
+                }
+                if (!rolloutPreviewRows[idx].limit) {
+                    rolloutPreviewRows[idx].limit = getCell(liveMatch, 'LIMIT');
+                }
+            }
+            renderRolloutPreviewTable();
+        }
+
+        function addManualRolloutPreviewRow() {
+            const defaultEng = document.getElementById('rolloutPanelEngineerSelect').value;
+            const defaultDateIso = document.getElementById('rolloutPanelDatePicker').value;
+            rolloutPreviewRows.push({
+                tid: '',
+                matched: false,
+                merchantLabel: 'Enter TID to match LIVE',
+                status: 'Done',
+                specialFunctionality: '',
+                rollOutDate: formatChosenDate(defaultDateIso, ''),
+                rollOutBy: defaultEng,
+                qr: '',
+                limit: ''
+            });
+            renderRolloutPreviewTable();
+        }
+
+        function removePreviewRow(idx) {
+            rolloutPreviewRows.splice(idx, 1);
+            renderRolloutPreviewTable();
+        }
+
+        function clearRolloutPreview() {
+            rolloutPreviewRows = [];
+            const fileInput = document.getElementById('rolloutPanelFileInput');
+            if (fileInput) fileInput.value = '';
+            document.getElementById('rolloutSheetBtnText').textContent = 'Sheet';
+            renderRolloutPreviewTable();
+            showToast('Rollout preview cleared');
+        }
+
+        async function handleRolloutSheetPreview(event) {
             const file = event.target.files[0];
             if (!file) return;
+            document.getElementById('rolloutSheetBtnText').textContent = file.name.slice(0, 12);
+
             const buf = await file.arrayBuffer();
             const wb = readWorkbookFromBuffer(buf);
             const rRows = parseSheetRows(wb);
@@ -937,88 +1231,98 @@
                 return;
             }
 
-            autoDetectEngineersFromRows(rRows);
+            const defaultEng = document.getElementById('rolloutPanelEngineerSelect').value;
+            const defaultDateIso = document.getElementById('rolloutPanelDatePicker').value;
 
-            const lineEntries = [];
-            let firstEngineer = '';
+            let firstMatchedEngineer = '';
             let firstDateIso = '';
+            const lineEntries = [];
 
             rRows.forEach(rr => {
                 const engVal = (getCell(rr, 'ROLL OUT BY') || getCell(rr, 'ROLLOUT BY') || getCell(rr, 'ENGINEER') || '').trim();
                 const dateVal = (getCell(rr, 'ROLL OUT DATE') || getCell(rr, 'ROLLOUT DATE') || getCell(rr, 'DATE') || '').trim();
-                const tidVal = getCell(rr, 'TID').trim();
-                const rawStatus = (
+                const tidVal = (getCell(rr, 'TID') || getCell(rr, 'TERMINAL ID') || '').trim();
+                const statusVal = normalizeCaseText(
                     getCell(rr, 'STATUS') ||
                     getCell(rr, 'REMARKS (IF ANY)') ||
                     getCell(rr, 'REMARKS') ||
                     getCell(rr, 'NW OS/ PROFILE DATE') ||
                     'Done'
-                ).trim();
+                ) || 'Done';
 
-                if (!firstEngineer && engVal) firstEngineer = engVal;
+                if (!firstMatchedEngineer && engVal) {
+                    const matched = detectEngineerFromFixedList(engVal);
+                    if (matched) firstMatchedEngineer = matched;
+                }
                 if (!firstDateIso && dateVal) {
                     const iso = parseAnyDateToIso(dateVal);
                     if (iso) firstDateIso = iso;
                 }
                 if (tidVal) {
-                    lineEntries.push(`${tidVal} ${normalizeCaseText(rawStatus || 'Done')}`);
+                    lineEntries.push(statusVal.toLowerCase() === 'done' ? tidVal : `${tidVal} ${statusVal}`);
                 }
             });
 
+            if (firstMatchedEngineer) {
+                document.getElementById('rolloutPanelEngineerSelect').value = firstMatchedEngineer;
+            }
+            if (firstDateIso) {
+                document.getElementById('rolloutPanelDatePicker').value = firstDateIso;
+            }
             if (lineEntries.length > 0) {
                 document.getElementById('quickTidStatusInput').value = lineEntries.join('\n');
             }
 
-            if (firstEngineer) {
-                const engSelect = document.getElementById('rolloutPanelEngineerSelect');
-                const matchedOpt = Array.from(engSelect.options).find(o => o.value.toLowerCase() === firstEngineer.toLowerCase());
-                if (matchedOpt) engSelect.value = matchedOpt.value;
-            }
+            const activeEng = document.getElementById('rolloutPanelEngineerSelect').value;
+            const activeIso = document.getElementById('rolloutPanelDatePicker').value;
 
-            if (firstDateIso) {
-                document.getElementById('rolloutPanelDatePicker').value = firstDateIso;
-            }
+            rolloutPreviewRows = rRows
+                .map(rr => buildPreviewRowFromExcel(rr, activeEng, activeIso))
+                .filter(p => p.tid || p.specialFunctionality || p.qr || p.limit);
 
-            showToast(`Auto-filled ${lineEntries.length} TIDs${firstEngineer ? ' • Eng: ' + firstEngineer : ''}${firstDateIso ? ' • Date: ' + firstDateIso : ''}`);
+            renderRolloutPreviewTable();
+            showToast(`Matched ${rolloutPreviewRows.length} rows against LIVE TIDs. Review or edit, then click Upload.`);
         }
 
         async function applyQuickRolloutUpdate() {
-            const eng = document.getElementById('rolloutPanelEngineerSelect').value;
-            const dateIso = document.getElementById('rolloutPanelDatePicker').value;
+            const defaultEng = document.getElementById('rolloutPanelEngineerSelect').value;
+            const defaultDateIso = document.getElementById('rolloutPanelDatePicker').value;
             const rawLines = document.getElementById('quickTidStatusInput').value;
             const fileInput = document.getElementById('rolloutPanelFileInput');
 
             const tidStatusMap = parseTidStatusLines(rawLines);
-            const perRowEngineer = new Map();
-            const perRowDateIso = new Map();
+            const sheetDetailsMap = new Map();
 
-            if (fileInput.files && fileInput.files[0]) {
+            // If user edited or loaded preview rows from Sheet, prioritize those edited values
+            if (rolloutPreviewRows && rolloutPreviewRows.length > 0) {
+                rolloutPreviewRows.forEach(pr => {
+                    const tid = String(pr.tid || '').trim().toUpperCase();
+                    if (!tid) return;
+                    const st = normalizeCaseText(pr.status || 'Done') || 'Done';
+                    tidStatusMap.set(tid, st);
+                    sheetDetailsMap.set(tid, {
+                        status: st,
+                        specialFunctionality: (pr.specialFunctionality || '').trim(),
+                        rollOutDate: (pr.rollOutDate || '').trim(),
+                        rollOutBy: (pr.rollOutBy || '').trim(),
+                        qr: (pr.qr || '').trim(),
+                        limit: (pr.limit || '').trim()
+                    });
+                });
+            } else if (fileInput.files && fileInput.files[0]) {
                 const buf = await fileInput.files[0].arrayBuffer();
                 const wb = readWorkbookFromBuffer(buf);
                 const rRows = parseSheetRows(wb);
-                autoDetectEngineersFromRows(rRows);
                 rRows.forEach(rr => {
-                    const tid = getCell(rr, 'TID').toUpperCase();
-                    if (!tid) return;
-                    const statusVal =
-                        getCell(rr, 'STATUS') ||
-                        getCell(rr, 'REMARKS (IF ANY)') ||
-                        getCell(rr, 'REMARKS') ||
-                        getCell(rr, 'NW OS/ PROFILE DATE') ||
-                        'Done';
-                    tidStatusMap.set(tid, normalizeCaseText(statusVal));
-
-                    const rowEng = (getCell(rr, 'ROLL OUT BY') || getCell(rr, 'ROLLOUT BY') || getCell(rr, 'ENGINEER') || '').trim();
-                    if (rowEng) perRowEngineer.set(tid, rowEng);
-
-                    const rowDate = (getCell(rr, 'ROLL OUT DATE') || getCell(rr, 'ROLLOUT DATE') || getCell(rr, 'DATE') || '').trim();
-                    const rowIso = parseAnyDateToIso(rowDate);
-                    if (rowIso) perRowDateIso.set(tid, rowIso);
+                    const pr = buildPreviewRowFromExcel(rr, defaultEng, defaultDateIso);
+                    if (!pr.tid) return;
+                    tidStatusMap.set(pr.tid, pr.status);
+                    sheetDetailsMap.set(pr.tid, pr);
                 });
             }
 
             if (tidStatusMap.size === 0) {
-                showToast('Enter or paste TID + Status lines or upload a Sheet first');
+                showToast('Enter or paste TIDs or upload a Sheet first');
                 return;
             }
 
@@ -1028,29 +1332,130 @@
                 const tid = getCell(row, 'TID').toUpperCase();
                 if (!tidStatusMap.has(tid)) return;
 
-                const statusText = normalizeCaseText(tidStatusMap.get(tid));
-                const rowEng = perRowEngineer.get(tid) || eng;
-                const rowIso = perRowDateIso.get(tid) || dateIso;
+                const sDet = sheetDetailsMap.get(tid);
+                const rawStatus = sDet ? sDet.status : tidStatusMap.get(tid);
+                const statusText = normalizeCaseText(rawStatus || 'Done');
+                const isDoneStatus = statusText.toLowerCase() === 'done';
+
+                const rowEng = (sDet && sDet.rollOutBy) ? sDet.rollOutBy : defaultEng;
                 const cfgDate = getCell(row, 'CONFIG DATE');
-                const formattedRolloutDate = formatChosenDate(rowIso, cfgDate);
+                const formattedRolloutDate = (sDet && sDet.rollOutDate)
+                    ? sDet.rollOutDate
+                    : formatChosenDate(defaultDateIso, cfgDate);
 
                 setCell(row, 'ROLL OUT BY', rowEng);
                 setCell(row, 'ROLL OUT DATE', formattedRolloutDate);
                 setCell(row, 'APP VERSION', activeAppVersion);
-                setCell(row, 'NW OS/ PROFILE DATE', 'Done');
 
-                if (statusText) {
+                if (sDet && sDet.specialFunctionality) {
+                    setCell(row, 'SPECIAL FUNCTIONALITY', sDet.specialFunctionality);
+                }
+                if (sDet && sDet.qr) {
+                    setCell(row, 'QR', normalizeCaseText(sDet.qr));
+                }
+                if (sDet && sDet.limit) {
+                    setCell(row, 'LIMIT', sDet.limit);
+                }
+
+                if (isDoneStatus) {
+                    setCell(row, 'NW OS/ PROFILE DATE', 'Done');
+                } else {
                     const prevRemarks = getCell(row, 'REMARKS (IF ANY)');
                     const merged = prevRemarks ? `${prevRemarks} | ${statusText}` : statusText;
                     setCell(row, 'REMARKS (IF ANY)', merged);
                 }
+
                 updatedCount++;
             });
 
+            rolloutPreviewRows = [];
+            renderRolloutPreviewTable();
             fileInput.value = '';
+            document.getElementById('rolloutSheetBtnText').textContent = 'Sheet';
             refreshAllUI();
             pushUpdatesToGoogleSheet('Rollout Update');
-            showToast(`Updated ${updatedCount} TIDs & synced to Google Sheet [Ver ${activeAppVersion}]`);
+            showToast(`Uploaded ${updatedCount} TIDs to LIVE & synced to Google Sheet [Ver ${activeAppVersion}]`);
+        }
+
+        // Bank Mail Excel -> Find matching TIDs from LIVE terminals & export
+        function extractTidsFromBankRows(rows) {
+            const tidSet = new Set();
+            rows.forEach(r => {
+                const directTid = getTidFromRow(r);
+                if (directTid) tidSet.add(directTid);
+
+                Object.values(r).forEach(val => {
+                    const str = String(val || '').trim();
+                    if (/^\d{6,15}$/.test(str)) {
+                        tidSet.add(str.toUpperCase());
+                    }
+                });
+            });
+            return tidSet;
+        }
+
+        function handleBankExcelMatch(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const wb = readWorkbookFromBuffer(e.target.result);
+                const bankRows = parseSheetRows(wb);
+                if (bankRows.length === 0) {
+                    showToast('No rows found in Bank Excel');
+                    return;
+                }
+
+                const bankTids = extractTidsFromBankRows(bankRows);
+                const matched = liveRows.filter(lRow => {
+                    const lTid = getTidFromRow(lRow);
+                    return lTid && bankTids.has(lTid);
+                });
+
+                bankMatchedRows = matched;
+                bankMatchActive = true;
+                currentDataset = 'LIVE';
+                switchViewTab('LIVE');
+
+                document.getElementById('exportBankCsvBtn').disabled = matched.length === 0;
+                document.getElementById('exportBankXlsxBtn').disabled = matched.length === 0;
+                document.getElementById('bankMatchSummary').innerHTML =
+                    `Bank file <strong class="text-amber-300">${file.name}</strong> has <strong class="text-purple-300">${bankTids.size}</strong> TIDs → Found <strong class="text-teal-300">${matched.length}</strong> matching terminals in <strong class="text-teal-300">LIVE DATA</strong>.`;
+
+                showToast(`Found ${matched.length} matching LIVE TIDs from bank file`);
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function clearBankMatchFilter() {
+            bankMatchedRows = [];
+            bankMatchActive = false;
+            const inp = document.getElementById('bankExcelInput');
+            if (inp) inp.value = '';
+            document.getElementById('exportBankCsvBtn').disabled = true;
+            document.getElementById('exportBankXlsxBtn').disabled = true;
+            document.getElementById('bankMatchSummary').innerHTML =
+                `Upload the Excel/CSV file received from bank mail to find matching TIDs from <strong class="text-teal-300">LIVE TERMINALS</strong> and export them for work.`;
+            applyFilters();
+            showToast('Cleared bank TID filter');
+        }
+
+        function exportBankMatched(ext = 'csv') {
+            if (!bankMatchedRows || bankMatchedRows.length === 0) {
+                showToast('No matched bank TIDs to export');
+                return;
+            }
+            const clean = bankMatchedRows.map(r => {
+                const obj = {};
+                activeHeaders.forEach(h => { obj[h.trim()] = getCell(r, h); });
+                return obj;
+            });
+            const ws = XLSX.utils.json_to_sheet(clean);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Bank_Matched_Live');
+            const fileName = `Bank_Matched_Live_TIDs.${ext}`;
+            XLSX.writeFile(wb, fileName);
+            showToast(`Exported ${bankMatchedRows.length} matched rows (${fileName})`);
         }
 
         function mergeHeadersFromRows(rows) {
@@ -1155,7 +1560,11 @@
         }
 
         function applyFilters() {
-            const source = currentDataset === 'LIVE' ? liveRows : withdrawnRows;
+            let source = currentDataset === 'LIVE' ? liveRows : withdrawnRows;
+            if (currentDataset === 'LIVE' && bankMatchActive) {
+                source = bankMatchedRows;
+            }
+
             const q = document.getElementById('globalSearch').value.trim().toLowerCase();
             const typeVal = document.getElementById('typeSelect').value;
             const cityVal = document.getElementById('citySelect').value;
