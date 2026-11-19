@@ -95,7 +95,7 @@
                 </label>
 
                 <div class="text-right pl-2.5 border-l border-line">
-                    <div id="liveClock" class="text-base sm:text-lg font-bold text-amber-300 leading-none font-mono">09:10:00 PM</div>
+                    <div id="liveClock" class="text-base sm:text-lg font-bold text-amber-300 leading-none font-mono">10:17:00 PM</div>
                     <div id="liveDate" class="text-[10px] font-semibold tracking-wider text-slate-400 uppercase mt-1">THU, NOV 19, 2026</div>
                 </div>
             </div>
@@ -179,7 +179,7 @@
                     <span>TID + STATUS ROLLOUT UPDATE</span>
                 </div>
                 <span class="text-[11px] text-slate-400">
-                    TID only (e.g. <code class="text-teal-300">18004252</code>) → <strong class="text-teal-300">Done</strong> • <code class="text-teal-300">Done</code> → <strong class="text-teal-300">NW OS/ PROFILE DATE</strong> • Non-Done → <strong class="text-amber-300">REMARKS (IF ANY)</strong> • App Version: <strong class="text-purple-300" id="panelVerBadge">43</strong>
+                    TID only (e.g. <code class="text-teal-300">18004252</code>) → <strong class="text-teal-300">Done</strong> • <code class="text-teal-300">Done</code> → <strong class="text-teal-300">NW OS/ PROFILE DATE</strong> • Non-Done → <strong class="text-amber-300">REMARKS (IF ANY)</strong> • Search App Version: <strong class="text-purple-300" id="panelVerBadge">43</strong>
                 </span>
             </div>
 
@@ -208,7 +208,7 @@
                 </div>
 
                 <div class="lg:col-span-2 flex items-center gap-2">
-                    <label id="rolloutSheetLabel" title="Upload Rollout Excel/CSV to filter & preview only matching LIVE TIDs"
+                    <label id="rolloutSheetLabel" title="Upload Rollout Excel/CSV to filter & preview only matching LIVE TIDs with Excel App Version"
                         class="bg-elevated hover:bg-slate-800 text-amber-200 border border-amber-300/35 px-2.5 py-2 rounded-lg text-xs font-semibold cursor-pointer flex-1 text-center truncate transition">
                         <i class="fa-solid fa-file-excel mr-1 text-amber-300"></i><span id="rolloutSheetBtnText">Sheet</span>
                         <input id="rolloutPanelFileInput" type="file" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleRolloutSheetPreview(event)">
@@ -227,7 +227,7 @@
                     <div class="space-y-0.5">
                         <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-teal-300">
                             <i class="fa-solid fa-table-list text-amber-300"></i>
-                            <span>LIVE TID Match Preview & Manual Edit (Only Matched LIVE TIDs Shown & Updated)</span>
+                            <span>LIVE TID Match Preview & Manual Edit (Includes App Version Preview)</span>
                         </div>
                         <p id="rolloutPreviewSummary" class="text-xs text-slate-300"></p>
                     </div>
@@ -256,6 +256,7 @@
                                 <th class="py-2 px-2.5 border-b border-line">TID</th>
                                 <th class="py-2 px-2.5 border-b border-line">MERCHANT / LIVE INFO</th>
                                 <th class="py-2 px-2.5 border-b border-line">STATUS (Done / Remarks)</th>
+                                <th class="py-2 px-2.5 border-b border-line">APP VERSION</th>
                                 <th class="py-2 px-2.5 border-b border-line">SPECIAL FUNCTIONALITY</th>
                                 <th class="py-2 px-2.5 border-b border-line">ROLL OUT DATE</th>
                                 <th class="py-2 px-2.5 border-b border-line">ROLL OUT BY</th>
@@ -343,13 +344,13 @@
                         <span>EXPORT</span>
                     </button>
 
-                    <!-- Engineer Filter with Fixed List + ALL ENGINEER Option -->
+                    <!-- Engineer Filter with Dynamic List + ALL ENGINEER Count -->
                     <div class="flex items-center gap-1.5 bg-elevated border border-line rounded-lg px-2 py-1">
                         <span class="text-[10px] font-bold uppercase tracking-wider text-purple-300 px-1">ENGINEERS:</span>
                         <select id="engineerSelect" onchange="applyFilters()" class="bg-surface border border-line rounded px-2 py-1 text-xs text-white outline-none">
                         </select>
                         <button onclick="openEngineerModal()" title="Edit / Add / Remove Engineers" class="bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 border border-purple-400/40 px-2.5 py-1 rounded text-xs font-semibold transition">
-                            <i class="fa-solid fa-users-gear mr-1"></i> Manage List
+                            <i class="fa-solid fa-users-gear mr-1"></i> Manage List (<span id="manageEngCountBadge">30</span>)
                         </button>
                     </div>
                 </div>
@@ -399,12 +400,14 @@
     <div id="engineerModal" class="fixed inset-0 bg-black/80 hidden items-center justify-center p-4 z-50">
         <div class="glass-card rounded-xl max-w-xl w-full max-h-[85vh] overflow-hidden flex flex-col shadow-2xl">
             <div class="px-5 py-3.5 bg-surface border-b border-line flex items-center justify-between">
-                <h3 class="text-sm font-bold text-purple-300 uppercase tracking-wider">Manage Engineer List</h3>
+                <h3 class="text-sm font-bold text-purple-300 uppercase tracking-wider">
+                    Manage Engineer List (<span id="modalEngineerCount">30</span>)
+                </h3>
                 <button onclick="closeModal('engineerModal')" class="text-slate-400 hover:text-white text-xl">&times;</button>
             </div>
             <div class="p-4 space-y-3 overflow-y-auto flex-1">
                 <div class="flex gap-2">
-                    <input id="newEngineerInput" type="text" placeholder="Add new engineer name..."
+                    <input id="newEngineerInput" type="text" onkeydown="if(event.key==='Enter') addEngineer()" placeholder="Add new engineer name..."
                         class="flex-1 bg-elevated border border-line focus:border-purple-400 rounded-lg px-3 py-2 text-xs text-white outline-none">
                     <button onclick="addEngineer()" class="bg-purple-400 hover:bg-purple-300 text-slate-950 font-bold px-4 py-2 rounded-lg text-xs">
                         Add
@@ -413,7 +416,7 @@
                 <div id="engineerListItems" class="space-y-2 max-h-72 overflow-y-auto pr-1"></div>
             </div>
             <div class="px-5 py-3 bg-surface border-t border-line flex justify-between items-center">
-                <button onclick="resetDefaultEngineers()" class="text-xs text-amber-300 hover:underline">Reset Default 30 Engineers</button>
+                <button onclick="resetDefaultEngineers()" class="text-xs text-amber-300 hover:underline">Reset Default List</button>
                 <button onclick="closeModal('engineerModal')" class="bg-elevated hover:bg-slate-800 text-white border border-line px-4 py-1.5 rounded-lg text-xs font-semibold">Done</button>
             </div>
         </div>
@@ -469,11 +472,19 @@
         let rolloutPreviewRows = [];
         let lastSheetTotalRows = 0;
         let lastSheetUnmatchedCount = 0;
+        let isSheetRolloutMode = false;
         let currentDataset = 'LIVE';
         let selectedVersion = 'ALL';
         let activeAppVersion = localStorage.getItem('pos_active_app_version') || '43';
         let availableVersions = JSON.parse(localStorage.getItem('pos_versions_list') || '["43"]');
-        let engineers = JSON.parse(localStorage.getItem('pos_engineers_list') || 'null') || [...DEFAULT_ENGINEERS];
+        let engineers = (() => {
+            try {
+                const saved = JSON.parse(localStorage.getItem('pos_engineers_list') || 'null');
+                return Array.isArray(saved) ? saved : [...DEFAULT_ENGINEERS];
+            } catch (e) {
+                return [...DEFAULT_ENGINEERS];
+            }
+        })();
         let currentPage = 1;
         const pageSize = 50;
 
@@ -637,6 +648,9 @@
             localStorage.setItem('pos_engineers_list', JSON.stringify(engineers));
             renderEngineerDropdowns();
             renderEngineerModalList();
+            if (rolloutPreviewRows && rolloutPreviewRows.length > 0) {
+                renderRolloutPreviewTable();
+            }
             applyFilters();
         }
 
@@ -655,7 +669,16 @@
 
             const prevPanel = selPanel.value;
             selPanel.innerHTML = opts;
-            if (prevPanel && engineers.includes(prevPanel)) selPanel.value = prevPanel;
+            if (prevPanel && engineers.includes(prevPanel)) {
+                selPanel.value = prevPanel;
+            } else if (engineers.length > 0) {
+                selPanel.value = engineers[0];
+            }
+
+            const badge = document.getElementById('manageEngCountBadge');
+            if (badge) badge.textContent = engineers.length;
+            const modalCount = document.getElementById('modalEngineerCount');
+            if (modalCount) modalCount.textContent = engineers.length;
         }
 
         function openEngineerModal() {
@@ -667,6 +690,16 @@
 
         function renderEngineerModalList() {
             const container = document.getElementById('engineerListItems');
+            const modalCount = document.getElementById('modalEngineerCount');
+            if (modalCount) modalCount.textContent = engineers.length;
+            const badge = document.getElementById('manageEngCountBadge');
+            if (badge) badge.textContent = engineers.length;
+
+            if (engineers.length === 0) {
+                container.innerHTML = `<div class="text-xs text-slate-400 text-center py-4">No engineers in list. Add a new name above.</div>`;
+                return;
+            }
+
             container.innerHTML = engineers.map((name, idx) => `
                 <div class="flex items-center justify-between gap-2 bg-elevated border border-line rounded-lg px-3 py-2">
                     <span class="text-xs text-slate-400 w-6">${idx + 1}.</span>
@@ -686,10 +719,15 @@
             const input = document.getElementById('newEngineerInput');
             const val = input.value.trim();
             if (!val) return;
+            const exists = engineers.some(e => e.toLowerCase() === val.toLowerCase());
+            if (exists) {
+                showToast(`${val} is already in the list`);
+                return;
+            }
             engineers.push(val);
             input.value = '';
             saveEngineers();
-            showToast(`Added ${val}`);
+            showToast(`Added ${val} (Total: ${engineers.length})`);
         }
 
         function updateEngineer(idx) {
@@ -698,19 +736,19 @@
             if (!val) return;
             engineers[idx] = val;
             saveEngineers();
-            showToast(`Updated engineer to ${val}`);
+            showToast(`Updated engineer to ${val} (Total: ${engineers.length})`);
         }
 
         function deleteEngineer(idx) {
             const removed = engineers.splice(idx, 1)[0];
             saveEngineers();
-            showToast(`Removed ${removed}`);
+            showToast(`Removed ${removed} (Total: ${engineers.length})`);
         }
 
         function resetDefaultEngineers() {
             engineers = [...DEFAULT_ENGINEERS];
             saveEngineers();
-            showToast('Restored default 30 engineers');
+            showToast(`Restored default ${engineers.length} engineers`);
         }
 
         function syncVersionSelectUI() {
@@ -726,6 +764,17 @@
             ).join('');
             document.getElementById('statActiveVer').textContent = activeAppVersion;
             document.getElementById('panelVerBadge').textContent = activeAppVersion;
+
+            if (rolloutPreviewRows && rolloutPreviewRows.length > 0) {
+                let changed = false;
+                rolloutPreviewRows.forEach(item => {
+                    if (item.source === 'search' || !item.appVersion) {
+                        item.appVersion = activeAppVersion;
+                        changed = true;
+                    }
+                });
+                if (changed) renderRolloutPreviewTable();
+            }
         }
 
         function changeActiveVersion(val) {
@@ -1005,12 +1054,14 @@
             const liveMatch = findLiveRowByTid(tidUpper);
             const cfgDate = liveMatch ? getCell(liveMatch, 'CONFIG DATE') : '';
             return {
+                source: 'search',
                 tid: tidUpper,
                 matched: Boolean(liveMatch),
                 merchantLabel: liveMatch
                     ? (getCell(liveMatch, 'MERCHANT NAME') || getCell(liveMatch, 'DBA NAME') || 'Live Terminal')
                     : 'Not found in LIVE',
                 status: normalizeCaseText(statusText || 'Done') || 'Done',
+                appVersion: activeAppVersion,
                 specialFunctionality: liveMatch ? getCell(liveMatch, 'SPECIAL FUNCTIONALITY') : '',
                 rollOutDate: formatChosenDate(defaultDateIso, cfgDate),
                 rollOutBy: defaultEng,
@@ -1021,7 +1072,7 @@
 
         function handleQuickInputPreview() {
             const fileInput = document.getElementById('rolloutPanelFileInput');
-            if (fileInput && fileInput.files && fileInput.files[0]) return;
+            if (isSheetRolloutMode || (fileInput && fileInput.files && fileInput.files[0])) return;
 
             lastSheetTotalRows = 0;
             lastSheetUnmatchedCount = 0;
@@ -1047,6 +1098,7 @@
                 const prev = existingByTid.get(tidKey);
                 if (prev) {
                     prev.status = normalizeCaseText(stVal || 'Done') || 'Done';
+                    if (prev.source === 'search') prev.appVersion = activeAppVersion;
                     nextRows.push(prev);
                 } else {
                     nextRows.push(buildPreviewRowFromTidStatus(tidKey, stVal, defaultEng, defaultDateIso));
@@ -1075,6 +1127,13 @@
             const tidRaw = (getCell(rr, 'TID') || getCell(rr, 'TERMINAL ID') || '').trim();
             const tidUpper = tidRaw.toUpperCase();
             const liveMatch = findLiveRowByTid(tidUpper);
+
+            const excelAppVer = (
+                getCell(rr, 'APP VERSION') ||
+                getCell(rr, 'APP_VERSION') ||
+                getCell(rr, 'VERSION') ||
+                ''
+            ).trim();
 
             const specialFunc = (
                 getCell(rr, 'SPECIAL FUNCTIONALITY') ||
@@ -1130,10 +1189,12 @@
                 : 'Not found in LIVE';
 
             return {
+                source: 'sheet',
                 tid: tidUpper,
                 matched: Boolean(liveMatch),
                 merchantLabel,
                 status: normalizeCaseText(statusRaw || 'Done') || 'Done',
+                appVersion: excelAppVer || activeAppVersion,
                 specialFunctionality: specialFunc,
                 rollOutDate: formattedDate,
                 rollOutBy: matchedEng || defaultEng,
@@ -1158,6 +1219,7 @@
             const missingCount = rolloutPreviewRows.length - matchedCount;
             const missingFieldsCount = rolloutPreviewRows.reduce((acc, r) => {
                 let miss = 0;
+                if (!r.appVersion) miss++;
                 if (!r.specialFunctionality) miss++;
                 if (!r.rollOutBy) miss++;
                 if (!r.rollOutDate) miss++;
@@ -1209,6 +1271,10 @@
                         <td class="py-2 px-2.5 whitespace-nowrap">
                             <input type="text" value="${item.status || 'Done'}" onchange="updatePreviewField(${idx}, 'status', this.value)"
                                 class="bg-elevated border border-line rounded px-2 py-1 text-xs text-amber-200 w-28 outline-none">
+                        </td>
+                        <td class="py-2 px-2.5 whitespace-nowrap">
+                            <input type="text" value="${item.appVersion || ''}" placeholder="Ver..." onchange="updatePreviewField(${idx}, 'appVersion', this.value)"
+                                class="bg-elevated border ${!item.appVersion ? 'border-amber-300/60' : 'border-purple-400/50'} rounded px-2 py-1 text-xs font-bold text-purple-200 w-20 outline-none">
                         </td>
                         <td class="py-2 px-2.5 whitespace-nowrap">
                             <input type="text" value="${item.specialFunctionality || ''}" placeholder="Fill missing..." onchange="updatePreviewField(${idx}, 'specialFunctionality', this.value)"
@@ -1267,10 +1333,12 @@
             const defaultEng = document.getElementById('rolloutPanelEngineerSelect').value;
             const defaultDateIso = document.getElementById('rolloutPanelDatePicker').value;
             rolloutPreviewRows.push({
+                source: 'search',
                 tid: '',
                 matched: false,
                 merchantLabel: 'Enter TID to match LIVE',
                 status: 'Done',
+                appVersion: activeAppVersion,
                 specialFunctionality: '',
                 rollOutDate: formatChosenDate(defaultDateIso, ''),
                 rollOutBy: defaultEng,
@@ -1289,6 +1357,10 @@
             rolloutPreviewRows = [];
             lastSheetTotalRows = 0;
             lastSheetUnmatchedCount = 0;
+            if (isSheetRolloutMode) {
+                document.getElementById('quickTidStatusInput').value = '';
+            }
+            isSheetRolloutMode = false;
             const fileInput = document.getElementById('rolloutPanelFileInput');
             if (fileInput) fileInput.value = '';
             document.getElementById('rolloutSheetBtnText').textContent = 'Sheet';
@@ -1296,11 +1368,11 @@
             showToast('Rollout preview cleared');
         }
 
-        // Only keep & show Excel rows whose TID matches LIVE terminals
         async function handleRolloutSheetPreview(event) {
             const file = event.target.files[0];
             if (!file) return;
             document.getElementById('rolloutSheetBtnText').textContent = file.name.slice(0, 12);
+            isSheetRolloutMode = true;
 
             const buf = await file.arrayBuffer();
             const wb = readWorkbookFromBuffer(buf);
@@ -1357,6 +1429,7 @@
             const defaultDateIso = document.getElementById('rolloutPanelDatePicker').value;
             const rawLines = document.getElementById('quickTidStatusInput').value;
             const fileInput = document.getElementById('rolloutPanelFileInput');
+            const hadSheetInput = isSheetRolloutMode || Boolean(fileInput && fileInput.files && fileInput.files[0]);
 
             const tidStatusMap = new Map();
             const sheetDetailsMap = new Map();
@@ -1369,6 +1442,7 @@
                     tidStatusMap.set(tid, st);
                     sheetDetailsMap.set(tid, {
                         status: st,
+                        appVersion: (pr.appVersion || activeAppVersion).trim(),
                         specialFunctionality: (pr.specialFunctionality || '').trim(),
                         rollOutDate: (pr.rollOutDate || '').trim(),
                         rollOutBy: (pr.rollOutBy || '').trim(),
@@ -1410,6 +1484,7 @@
                 const isDoneStatus = statusText.toLowerCase() === 'done';
 
                 const rowEng = (sDet && sDet.rollOutBy) ? sDet.rollOutBy : defaultEng;
+                const rowAppVer = (sDet && sDet.appVersion) ? sDet.appVersion : activeAppVersion;
                 const cfgDate = getCell(row, 'CONFIG DATE');
                 const formattedRolloutDate = (sDet && sDet.rollOutDate)
                     ? sDet.rollOutDate
@@ -1417,7 +1492,7 @@
 
                 setCell(row, 'ROLL OUT BY', rowEng);
                 setCell(row, 'ROLL OUT DATE', formattedRolloutDate);
-                setCell(row, 'APP VERSION', activeAppVersion);
+                setCell(row, 'APP VERSION', rowAppVer);
 
                 if (sDet && sDet.specialFunctionality) {
                     setCell(row, 'SPECIAL FUNCTIONALITY', sDet.specialFunctionality);
@@ -1440,18 +1515,23 @@
                 updatedCount++;
             });
 
+            // Automatically clear/delete the TIDs from the search input box after Excel upload
+            if (hadSheetInput) {
+                document.getElementById('quickTidStatusInput').value = '';
+            }
+
             rolloutPreviewRows = [];
             lastSheetTotalRows = 0;
             lastSheetUnmatchedCount = 0;
+            isSheetRolloutMode = false;
             renderRolloutPreviewTable();
             fileInput.value = '';
             document.getElementById('rolloutSheetBtnText').textContent = 'Sheet';
             refreshAllUI();
             pushUpdatesToGoogleSheet('Rollout Update');
-            showToast(`Uploaded ${updatedCount} matched TIDs to LIVE & synced [Ver ${activeAppVersion}]`);
+            showToast(`Uploaded ${updatedCount} matched TIDs to LIVE & synced`);
         }
 
-        // Bank Mail Excel -> Find matching TIDs from LIVE terminals & export
         function extractTidsFromBankRows(rows) {
             const tidSet = new Set();
             rows.forEach(r => {
