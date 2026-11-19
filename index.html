@@ -61,11 +61,11 @@
                     </h1>
                     <div class="flex items-center gap-2 text-[11px] font-semibold tracking-wider text-teal-300 uppercase">
                         <span class="w-2 h-2 rounded-full bg-teal-300 animate-ping"></span>
-                        <span>LIVE WORKSPACE</span>
+                        <span id="cloudSyncStatus">AUTO-SYNC READY</span>
                     </div>
                 </div>
 
-                <button onclick="syncGoogleSheet()" class="bg-elevated hover:bg-slate-800 text-teal-300 border border-teal-400/35 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition">
+                <button onclick="syncGoogleSheet(true)" class="bg-elevated hover:bg-slate-800 text-teal-300 border border-teal-400/35 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition">
                     <i class="fa-solid fa-rotate" id="syncIcon"></i>
                     <span>Sync Live</span>
                 </button>
@@ -73,7 +73,7 @@
 
             <!-- Upload Controls & Live Clock -->
             <div class="flex flex-wrap items-center gap-2">
-                <input id="sheetUrlInput" type="text" placeholder="Google Sheet CSV URL..."
+                <input id="sheetUrlInput" type="text" placeholder="Google Sheet / Apps Script URL..."
                     class="bg-elevated border border-line focus:border-teal-300 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-400 w-48 sm:w-60 outline-none">
 
                 <label class="bg-teal-400/15 hover:bg-teal-400/25 text-teal-200 border border-teal-300/40 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1.5 transition">
@@ -95,7 +95,7 @@
                 </label>
 
                 <div class="text-right pl-2.5 border-l border-line">
-                    <div id="liveClock" class="text-base sm:text-lg font-bold text-amber-300 leading-none font-mono">04:21:00 PM</div>
+                    <div id="liveClock" class="text-base sm:text-lg font-bold text-amber-300 leading-none font-mono">05:04:00 PM</div>
                     <div id="liveDate" class="text-[10px] font-semibold tracking-wider text-slate-400 uppercase mt-1">THU, NOV 19, 2026</div>
                 </div>
             </div>
@@ -145,7 +145,7 @@
             </div>
         </div>
 
-        <!-- Marked Section 1: APP VERSION DISTRIBUTION (CLICK TO FILTER) -->
+        <!-- APP VERSION DISTRIBUTION (CLICK TO FILTER) -->
         <section class="glass-card rounded-xl p-4 space-y-3">
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <div class="flex items-center gap-2 text-xs font-bold tracking-wider text-teal-300 uppercase">
@@ -171,7 +171,7 @@
             </div>
         </section>
 
-        <!-- Marked Section 2: TID + STATUS ROLLOUT UPDATE -->
+        <!-- TID + STATUS ROLLOUT UPDATE -->
         <section class="glass-card rounded-xl p-4 space-y-3">
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <div class="flex items-center gap-2 text-xs font-bold tracking-wider text-amber-300 uppercase">
@@ -297,7 +297,7 @@
                     <tbody id="tableBody" class="divide-y divide-line/60">
                         <tr>
                             <td class="py-12 text-center text-slate-400">
-                                Load your <strong>Master/Live Sheet</strong>, upload <strong>Daily Excel</strong>, or <strong>Sync Live</strong> from Google Sheet.
+                                Loading from Google Sheet or upload <strong>Master/Live Sheet</strong> / <strong>Daily Excel</strong>.
                             </td>
                         </tr>
                     </tbody>
@@ -349,6 +349,8 @@
     <div id="toast" class="fixed bottom-5 right-5 bg-teal-300 text-slate-950 font-bold text-xs px-4 py-2.5 rounded-lg shadow-xl hidden z-50"></div>
 
     <script>
+        const DEFAULT_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw3Us6FRybdcPgr76v_twBaBckwPwA20I2r-u73IuJ71fNMh8JIYUv4xUElOvOAMchP/exec";
+
         const MASTER_HEADERS = [
             "SL.", "PURPOSE", "CONFIG DATE", "OLD MID ", "OLD TID", "MID ", "TID",
             "MERCHANT NAME", "DBA NAME", "ADDRESS", "CITY", "LOCATION", "VENDOR",
@@ -380,6 +382,11 @@
         let engineers = JSON.parse(localStorage.getItem('pos_engineers_list') || 'null') || [...DEFAULT_ENGINEERS];
         let currentPage = 1;
         const pageSize = 50;
+
+        function getSyncEndpoint() {
+            const inputVal = (document.getElementById('sheetUrlInput').value || '').trim();
+            return inputVal || DEFAULT_APPS_SCRIPT_URL;
+        }
 
         function updateClock() {
             const now = new Date();
@@ -422,6 +429,28 @@
             const cleaned = String(raw || '').trim().replace(/\s+/g, ' ');
             if (!cleaned) return '';
             return cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase();
+        }
+
+        function normKey(raw) {
+            return String(raw || '').trim().toUpperCase();
+        }
+
+        function getTidFromRow(row) {
+            return normKey(getCell(row, 'TID') || getCell(row, 'TERMINAL ID') || '');
+        }
+
+        function getOldTidFromRow(row) {
+            return normKey(getCell(row, 'OLD TID') || getCell(row, 'OLD_TID') || '');
+        }
+
+        function getPosSerialFromRow(row) {
+            return normKey(
+                getCell(row, 'POS SERIAL') ||
+                getCell(row, 'POS_SERIAL') ||
+                getCell(row, 'SERIAL NO') ||
+                getCell(row, 'SERIAL NUMBER') ||
+                ''
+            );
         }
 
         function parseTidStatusLines(rawText) {
@@ -684,7 +713,7 @@
             let headerRowIdx = 0;
             for (let i = 0; i < Math.min(5, matrix.length); i++) {
                 const rowUpper = matrix[i].map(c => String(c || '').trim().toUpperCase());
-                if (rowUpper.includes('TID') || rowUpper.includes('MERCHANT NAME') || rowUpper.includes('SL.')) {
+                if (rowUpper.includes('TID') || rowUpper.includes('MERCHANT NAME') || rowUpper.includes('SL.') || rowUpper.includes('POS SERIAL')) {
                     headerRowIdx = i;
                     break;
                 }
@@ -709,6 +738,77 @@
             return XLSX.read(new Uint8Array(buffer), { type: 'array', cellDates: true });
         }
 
+        async function pushUpdatesToGoogleSheet(reasonLabel = 'Auto-saved') {
+            const endpoint = getSyncEndpoint();
+            if (!endpoint || !endpoint.includes('script.google.com')) return;
+
+            const statusEl = document.getElementById('cloudSyncStatus');
+            statusEl.textContent = 'SAVING TO SHEET...';
+
+            try {
+                await fetch(endpoint, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({
+                        headers: activeHeaders.map(h => h.trim()),
+                        live: liveRows,
+                        withdrawn: withdrawnRows,
+                        activeAppVersion: activeAppVersion,
+                        updatedAt: new Date().toISOString()
+                    })
+                });
+                statusEl.textContent = `SYNCED (${reasonLabel})`;
+            } catch (err) {
+                statusEl.textContent = 'SYNC RETRY NEEDED';
+            }
+        }
+
+        async function syncGoogleSheet(showNotice = false) {
+            const endpoint = getSyncEndpoint();
+            if (!endpoint) {
+                if (showNotice) showToast('No Google Sheet URL configured');
+                return;
+            }
+            const icon = document.getElementById('syncIcon');
+            const statusEl = document.getElementById('cloudSyncStatus');
+            icon.classList.add('fa-spin');
+            statusEl.textContent = 'SYNCING...';
+
+            try {
+                if (endpoint.includes('script.google.com')) {
+                    const res = await fetch(endpoint, { method: 'GET', cache: 'no-store' });
+                    const data = await res.json();
+                    if (Array.isArray(data.live)) {
+                        liveRows = data.live;
+                    }
+                    if (Array.isArray(data.withdrawn)) {
+                        withdrawnRows = data.withdrawn;
+                    }
+                    mergeHeadersFromRows(liveRows.concat(withdrawnRows));
+                    autoDetectEngineersFromRows(liveRows.concat(withdrawnRows));
+                    refreshAllUI();
+                    statusEl.textContent = 'LIVE SYNCED';
+                    if (showNotice) showToast(`Synced ${liveRows.length} live & ${withdrawnRows.length} withdrawn rows`);
+                } else {
+                    const res = await fetch(endpoint);
+                    const csvText = await res.text();
+                    const wb = XLSX.read(csvText, { type: 'string', raw: false });
+                    liveRows = parseSheetRows(wb);
+                    mergeHeadersFromRows(liveRows);
+                    autoDetectEngineersFromRows(liveRows);
+                    refreshAllUI();
+                    statusEl.textContent = 'CSV SYNCED';
+                    if (showNotice) showToast(`Synced ${liveRows.length} rows from Google Sheet`);
+                }
+            } catch (err) {
+                statusEl.textContent = 'SYNC OFFLINE / CHECK ACCESS';
+                if (showNotice) showToast('Could not sync Google Sheet. Check Web App access (Anyone).');
+            } finally {
+                icon.classList.remove('fa-spin');
+            }
+        }
+
         function handleLiveUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -719,34 +819,11 @@
                 mergeHeadersFromRows(liveRows);
                 const detectedEng = autoDetectEngineersFromRows(liveRows);
                 refreshAllUI();
+                pushUpdatesToGoogleSheet('Master Upload');
                 const extra = detectedEng > 0 ? ` • ${detectedEng} new engineers detected` : '';
-                showToast(`Loaded ${liveRows.length} live records${extra}`);
+                showToast(`Loaded ${liveRows.length} live records & synced to Google Sheet${extra}`);
             };
             reader.readAsArrayBuffer(file);
-        }
-
-        async function syncGoogleSheet() {
-            const url = document.getElementById('sheetUrlInput').value.trim();
-            if (!url) {
-                showToast('Paste a Published Google Sheet CSV link first');
-                return;
-            }
-            const icon = document.getElementById('syncIcon');
-            icon.classList.add('fa-spin');
-            try {
-                const res = await fetch(url);
-                const csvText = await res.text();
-                const wb = XLSX.read(csvText, { type: 'string', raw: false });
-                liveRows = parseSheetRows(wb);
-                mergeHeadersFromRows(liveRows);
-                autoDetectEngineersFromRows(liveRows);
-                refreshAllUI();
-                showToast(`Synced ${liveRows.length} rows from Google Sheet`);
-            } catch (err) {
-                showToast('Could not fetch sheet. Ensure it is Published as CSV.');
-            } finally {
-                icon.classList.remove('fa-spin');
-            }
         }
 
         function handleWithdrawnUpload(event) {
@@ -765,7 +842,8 @@
                 mergeHeadersFromRows(withdrawnRows);
                 autoDetectEngineersFromRows(uploaded);
                 refreshAllUI();
-                showToast(`Added ${uploaded.length} records to Withdrawn`);
+                pushUpdatesToGoogleSheet('Withdrawn Upload');
+                showToast(`Added ${uploaded.length} records to Withdrawn & synced`);
             };
             reader.readAsArrayBuffer(file);
         }
@@ -785,17 +863,19 @@
                 mergeHeadersFromRows(dailyRows);
                 const detectedEng = autoDetectEngineersFromRows(dailyRows);
 
-                const dailyOldTids = new Set();
+                // Collect TID, OLD TID, and POS SERIAL from newly uploaded Daily Excel
                 const dailyTids = new Set();
-                const dailyOldSerials = new Set();
+                const dailyOldTids = new Set();
+                const dailyPosSerials = new Set();
 
                 const preparedDaily = dailyRows.map((dRow, i) => {
-                    const oldTid = getCell(dRow, 'OLD TID');
-                    const tid = getCell(dRow, 'TID');
-                    const oldSerial = getCell(dRow, 'OLD POS SERIAL');
-                    if (oldTid) dailyOldTids.add(oldTid.toUpperCase());
-                    if (tid) dailyTids.add(tid.toUpperCase());
-                    if (oldSerial) dailyOldSerials.add(oldSerial.toUpperCase());
+                    const tid = getTidFromRow(dRow);
+                    const oldTid = getOldTidFromRow(dRow);
+                    const posSerial = getPosSerialFromRow(dRow);
+
+                    if (tid) dailyTids.add(tid);
+                    if (oldTid) dailyOldTids.add(oldTid);
+                    if (posSerial) dailyPosSerials.add(posSerial);
 
                     const normalized = {};
                     activeHeaders.forEach(h => {
@@ -811,18 +891,25 @@
                 const remainingLive = [];
                 let movedToWithdrawn = 0;
 
+                // Check OLD TID, TID, and POS SERIAL duplicates in old live rows and move duplicates to WITHDRAWN
                 liveRows.forEach(lRow => {
-                    const lOldTid = getCell(lRow, 'OLD TID').toUpperCase();
-                    const lTid = getCell(lRow, 'TID').toUpperCase();
-                    const lOldSerial = getCell(lRow, 'OLD POS SERIAL').toUpperCase();
+                    const lTid = getTidFromRow(lRow);
+                    const lOldTid = getOldTidFromRow(lRow);
+                    const lPosSerial = getPosSerialFromRow(lRow);
 
-                    const isMatchedOld =
-                        (lOldTid && dailyOldTids.has(lOldTid)) ||
-                        (lTid && (dailyOldTids.has(lTid) || dailyTids.has(lTid))) ||
-                        (lOldSerial && dailyOldSerials.has(lOldSerial));
+                    const matchedReasons = [];
+                    if (lTid && (dailyTids.has(lTid) || dailyOldTids.has(lTid))) {
+                        matchedReasons.push(`TID (${lTid})`);
+                    }
+                    if (lOldTid && (dailyTids.has(lOldTid) || dailyOldTids.has(lOldTid))) {
+                        matchedReasons.push(`OLD TID (${lOldTid})`);
+                    }
+                    if (lPosSerial && dailyPosSerials.has(lPosSerial)) {
+                        matchedReasons.push(`POS SERIAL (${lPosSerial})`);
+                    }
 
-                    if (isMatchedOld) {
-                        setCell(lRow, 'WITHDRAWN REPORT', `Replaced by Daily Excel (${activeAppVersion})`);
+                    if (matchedReasons.length > 0) {
+                        setCell(lRow, 'WITHDRAWN REPORT', `Duplicate ${matchedReasons.join(', ')} - Replaced by Daily Excel`);
                         withdrawnRows.push(lRow);
                         movedToWithdrawn++;
                     } else {
@@ -832,8 +919,9 @@
 
                 liveRows = remainingLive.concat(preparedDaily);
                 refreshAllUI();
+                pushUpdatesToGoogleSheet('Daily Excel');
                 const extra = detectedEng > 0 ? ` • ${detectedEng} new engineers detected` : '';
-                showToast(`Daily Excel processed (Ver ${activeAppVersion}): ${movedToWithdrawn} withdrawn, ${preparedDaily.length} added${extra}`);
+                showToast(`Duplicate check done: ${movedToWithdrawn} moved to Withdrawn, ${preparedDaily.length} added to Live & synced${extra}`);
             };
             reader.readAsArrayBuffer(file);
         }
@@ -961,7 +1049,8 @@
 
             fileInput.value = '';
             refreshAllUI();
-            showToast(`Updated ${updatedCount} TIDs • NW OS/ PROFILE DATE: Done • REMARKS updated [Ver ${activeAppVersion}]`);
+            pushUpdatesToGoogleSheet('Rollout Update');
+            showToast(`Updated ${updatedCount} TIDs & synced to Google Sheet [Ver ${activeAppVersion}]`);
         }
 
         function mergeHeadersFromRows(rows) {
@@ -1211,10 +1300,12 @@
             writeRowsToCSV(rows, `AppVersion_${selectedVersion.replace(/\s+/g, '_')}.csv`);
         }
 
+        document.getElementById('sheetUrlInput').value = DEFAULT_APPS_SCRIPT_URL;
         syncVersionSelectUI();
         renderEngineerDropdowns();
         setDefaultDatePicker();
         renderHeader();
+        syncGoogleSheet(false);
     </script>
 </body>
 </html>
