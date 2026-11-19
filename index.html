@@ -95,8 +95,8 @@
                 </label>
 
                 <div class="text-right pl-2.5 border-l border-line">
-                    <div id="liveClock" class="text-base sm:text-lg font-bold text-amber-300 leading-none font-mono">10:59:00 PM</div>
-                    <div id="liveDate" class="text-[10px] font-semibold tracking-wider text-slate-400 uppercase mt-1">THU, NOV 19, 2026</div>
+                    <div id="liveClock" class="text-base sm:text-lg font-bold text-amber-300 leading-none font-mono">12:35:00 AM</div>
+                    <div id="liveDate" class="text-[10px] font-semibold tracking-wider text-slate-400 uppercase mt-1">FRI, NOV 20, 2026</div>
                 </div>
             </div>
         </div>
@@ -258,6 +258,7 @@
                                 <th class="py-2 px-2.5 border-b border-line">STATUS (Done / Remarks)</th>
                                 <th class="py-2 px-2.5 border-b border-line">APP VERSION</th>
                                 <th class="py-2 px-2.5 border-b border-line">SPECIAL FUNCTIONALITY</th>
+                                <th class="py-2 px-2.5 border-b border-line">PURPOSE</th>
                                 <th class="py-2 px-2.5 border-b border-line">ROLL OUT DATE</th>
                                 <th class="py-2 px-2.5 border-b border-line">ROLL OUT BY</th>
                                 <th class="py-2 px-2.5 border-b border-line">QR</th>
@@ -1064,6 +1065,7 @@
                 status: normalizeCaseText(statusText || 'Done') || 'Done',
                 appVersion: activeAppVersion,
                 specialFunctionality: liveMatch ? getCell(liveMatch, 'SPECIAL FUNCTIONALITY') : '',
+                purpose: liveMatch ? getCell(liveMatch, 'PURPOSE') : '',
                 rollOutDate: formatChosenDate(defaultDateIso, cfgDate),
                 rollOutBy: defaultEng,
                 qr: liveMatch ? getCell(liveMatch, 'QR') : '',
@@ -1125,6 +1127,7 @@
         }
 
         // Preserve exact Excel values and match ONLY against LIVE TID (never OLD TID)
+        // If Excel row has SPECIAL FUNCTIONALITY, also carry Excel PURPOSE to update LIVE PURPOSE
         function buildPreviewRowFromExcel(rr, defaultEng, defaultDateIso) {
             const tidRaw = (getCell(rr, 'TID') || getCell(rr, 'TERMINAL ID') || '').trim();
             const tidUpper = tidRaw.toUpperCase();
@@ -1141,6 +1144,11 @@
                 getCell(rr, 'SPECIAL FUNCTIONALITY') ||
                 getCell(rr, 'SPECIAL_FUNCTIONALITY') ||
                 getCell(rr, 'FEATURE') ||
+                ''
+            ).trim();
+
+            const excelPurpose = (
+                getCell(rr, 'PURPOSE') ||
                 ''
             ).trim();
 
@@ -1181,6 +1189,7 @@
                 status: statusRaw ? normalizeCaseText(statusRaw) : '',
                 appVersion: excelAppVer,
                 specialFunctionality: excelSpecialFunc,
+                purpose: excelSpecialFunc ? excelPurpose : '',
                 rollOutDate: excelRollDate,
                 rollOutBy: excelEng,
                 qr: excelQr,
@@ -1264,6 +1273,10 @@
                                 class="bg-elevated border ${!item.specialFunctionality ? 'border-amber-300/60' : 'border-line'} rounded px-2 py-1 text-xs text-white w-36 outline-none">
                         </td>
                         <td class="py-2 px-2.5 whitespace-nowrap">
+                            <input type="text" value="${item.purpose || ''}" placeholder="${liveFound ? (getCell(liveFound, 'PURPOSE') || 'Keep LIVE') : 'Purpose...'}" onchange="updatePreviewField(${idx}, 'purpose', this.value)"
+                                class="bg-elevated border ${item.specialFunctionality && item.purpose ? 'border-teal-300/60' : 'border-line'} rounded px-2 py-1 text-xs text-teal-200 w-28 outline-none">
+                        </td>
+                        <td class="py-2 px-2.5 whitespace-nowrap">
                             <input type="text" value="${item.rollOutDate || ''}" placeholder="${liveFound ? (getCell(liveFound, 'ROLL OUT DATE') || 'Keep LIVE') : 'Date...'}" onchange="updatePreviewField(${idx}, 'rollOutDate', this.value)"
                                 class="bg-elevated border ${!item.rollOutDate ? 'border-amber-300/60' : 'border-line'} rounded px-2 py-1 text-xs text-white w-28 outline-none">
                         </td>
@@ -1312,6 +1325,7 @@
                 status: 'Done',
                 appVersion: activeAppVersion,
                 specialFunctionality: '',
+                purpose: '',
                 rollOutDate: formatChosenDate(defaultDateIso, ''),
                 rollOutBy: defaultEng,
                 qr: '',
@@ -1403,6 +1417,7 @@
                         status: (pr.status || '').trim(),
                         appVersion: (pr.appVersion || '').trim(),
                         specialFunctionality: (pr.specialFunctionality || '').trim(),
+                        purpose: (pr.purpose || '').trim(),
                         rollOutDate: (pr.rollOutDate || '').trim(),
                         rollOutBy: (pr.rollOutBy || '').trim(),
                         qr: (pr.qr || '').trim(),
@@ -1426,6 +1441,7 @@
                         status: st,
                         appVersion: activeAppVersion,
                         specialFunctionality: '',
+                        purpose: '',
                         rollOutDate: '',
                         rollOutBy: defaultEng,
                         qr: '',
@@ -1461,6 +1477,10 @@
                     }
                     if (sDet.specialFunctionality) {
                         setCell(row, 'SPECIAL FUNCTIONALITY', sDet.specialFunctionality);
+                        // When Excel has SPECIAL FUNCTIONALITY, also update LIVE PURPOSE with Excel PURPOSE
+                        if (sDet.purpose) {
+                            setCell(row, 'PURPOSE', sDet.purpose);
+                        }
                     }
                     if (sDet.qr) {
                         setCell(row, 'QR', sDet.qr);
@@ -1492,6 +1512,9 @@
 
                     if (sDet.specialFunctionality) {
                         setCell(row, 'SPECIAL FUNCTIONALITY', sDet.specialFunctionality);
+                        if (sDet.purpose) {
+                            setCell(row, 'PURPOSE', sDet.purpose);
+                        }
                     }
                     if (sDet.qr) {
                         setCell(row, 'QR', sDet.qr);
