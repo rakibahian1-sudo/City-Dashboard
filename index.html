@@ -316,9 +316,10 @@
         <section class="glass-card rounded-xl p-4 space-y-3">
             <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
                 <div class="flex flex-wrap items-center gap-2 flex-1">
+                    <!-- 1st Mark: Multi-TID & General Search -->
                     <div class="relative flex-1 min-w-[220px] max-w-md">
                         <i class="fa-solid fa-magnifying-glass text-teal-300/70 text-xs absolute left-3.5 top-1/2 -translate-y-1/2"></i>
-                        <input id="globalSearch" type="text" oninput="applyFilters()" placeholder="Search TID, OLD TID, MID, POS Serial, Merchant..."
+                        <input id="globalSearch" type="text" oninput="applyFilters()" placeholder="Search TID (multiple ok), OLD TID, MID, POS Serial, Merchant..."
                             class="w-full bg-elevated border border-line focus:border-teal-300 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-100 placeholder-slate-400 outline-none">
                     </div>
 
@@ -330,13 +331,56 @@
                         <option value="FOR TEST">FOR TEST</option>
                     </select>
 
-                    <select id="citySelect" onchange="applyFilters()"
-                        class="bg-elevated border border-line focus:border-teal-300 rounded-lg px-3 py-2 text-xs font-semibold text-slate-100 outline-none">
-                        <option value="ALL">CITY: ALL CITIES</option>
-                    </select>
-                    <button onclick="exportSelectedCity()" class="bg-elevated hover:bg-slate-800 text-amber-200 border border-amber-300/35 px-3 py-2 rounded-lg text-xs font-semibold transition">
-                        <i class="fa-solid fa-city mr-1"></i> Export City
-                    </button>
+                    <!-- 2nd Mark: City Select + Search/Multi-Select Cities Popup + Export City -->
+                    <div class="relative flex items-center gap-1.5">
+                        <select id="citySelect" onchange="handleSingleCityDropdownChange(this.value)"
+                            class="bg-elevated border border-line focus:border-teal-300 rounded-lg px-3 py-2 text-xs font-semibold text-slate-100 outline-none">
+                            <option value="ALL">CITY: ALL CITIES</option>
+                        </select>
+
+                        <button type="button" onclick="toggleCityMultiDropdown(event)" id="cityMultiBtn"
+                            class="bg-elevated hover:bg-slate-800 text-teal-200 border border-teal-300/35 px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-list-check text-teal-300"></i>
+                            <span id="cityMultiBtnLabel">Select Cities</span>
+                            <i class="fa-solid fa-chevron-down text-[10px]"></i>
+                        </button>
+
+                        <button onclick="exportSelectedCity()" class="bg-elevated hover:bg-slate-800 text-amber-200 border border-amber-300/35 px-3 py-2 rounded-lg text-xs font-semibold transition">
+                            <i class="fa-solid fa-city mr-1"></i> Export City
+                        </button>
+
+                        <!-- Search & Select Cities Dropdown Panel -->
+                        <div id="cityMultiPanel" onclick="event.stopPropagation()"
+                            class="hidden absolute left-0 top-full mt-1.5 w-80 bg-surface border border-teal-300/45 rounded-xl shadow-2xl z-30 p-3 space-y-2.5">
+                            <div class="relative">
+                                <i class="fa-solid fa-magnifying-glass text-teal-300/70 text-[11px] absolute left-2.5 top-1/2 -translate-y-1/2"></i>
+                                <input id="citySearchInput" type="text" oninput="renderCityMultiList()" placeholder="Search city to select..."
+                                    class="w-full bg-elevated border border-line focus:border-teal-300 rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-white placeholder-slate-400 outline-none">
+                            </div>
+
+                            <div class="flex items-center justify-between text-[11px] px-0.5">
+                                <span id="citySelectedCountText" class="text-teal-300 font-semibold">0 city selected</span>
+                                <div class="flex items-center gap-2">
+                                    <button type="button" onclick="selectAllVisibleCities()" class="text-amber-200 hover:underline">Select All</button>
+                                    <button type="button" onclick="clearSelectedCities()" class="text-rose-300 hover:underline">Clear</button>
+                                </div>
+                            </div>
+
+                            <div id="cityMultiCheckboxList" class="max-h-52 overflow-y-auto space-y-1 pr-1 divide-y divide-line/40"></div>
+
+                            <div class="pt-2 border-t border-line flex items-center justify-between gap-2">
+                                <button type="button" onclick="closeCityMultiDropdown()"
+                                    class="bg-elevated hover:bg-slate-800 text-slate-200 border border-line px-2.5 py-1.5 rounded-lg text-xs font-semibold">
+                                    Done
+                                </button>
+                                <button type="button" onclick="exportSelectedCity()"
+                                    class="bg-amber-300 hover:bg-amber-200 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5">
+                                    <i class="fa-solid fa-file-arrow-down"></i>
+                                    <span>Export Selected</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
@@ -487,6 +531,8 @@
         let isSheetRolloutMode = false;
         let currentDataset = 'LIVE';
         let selectedVersion = 'ALL';
+        let allAvailableCities = [];
+        let selectedCities = new Set();
         let activeAppVersion = localStorage.getItem('pos_active_app_version') || '43';
         let availableVersions = JSON.parse(localStorage.getItem('pos_versions_list') || '["43"]');
         let engineers = (() => {
@@ -499,6 +545,10 @@
         })();
         let currentPage = 1;
         const pageSize = 50;
+
+        document.addEventListener('click', () => {
+            closeCityMultiDropdown();
+        });
 
         function getSyncEndpoint() {
             const inputVal = (document.getElementById('sheetUrlInput').value || '').trim();
@@ -570,7 +620,6 @@
             );
         }
 
-        // Appends ",SPECIAL FUNCTIONALITY" to the existing LIVE PURPOSE (e.g. "REPLACE" -> "REPLACE,SPECIAL FUNCTIONALITY")
         function appendSpecialFunctionalityToPurpose(basePurpose) {
             const cleanBase = String(basePurpose || '').trim();
             if (!cleanBase) return 'SPECIAL FUNCTIONALITY';
@@ -581,7 +630,6 @@
             return `${cleanBase},SPECIAL FUNCTIONALITY`;
         }
 
-        // Detects EMI tenures from Month 3..Month 36 columns (ignores 0 or blank values)
         function detectEmiSpecialFunctionalityFromRow(rr) {
             const activeTenures = [];
             EMI_TENURE_COLUMNS.forEach(({ col, tenure }) => {
@@ -680,13 +728,6 @@
             const m = String(now.getMonth() + 1).padStart(2, '0');
             const d = String(now.getDate()).padStart(2, '0');
             document.getElementById('rolloutPanelDatePicker').value = `${y}-${m}-${d}`;
-        }
-
-        function detectEngineerFromFixedList(rawName) {
-            const clean = String(rawName || '').trim().replace(/\s+/g, ' ');
-            if (!clean) return '';
-            const matched = engineers.find(e => e.toLowerCase() === clean.toLowerCase());
-            return matched || '';
         }
 
         function saveEngineers() {
@@ -1703,6 +1744,116 @@
             return 'MERCHANT';
         }
 
+        function toggleCityMultiDropdown(event) {
+            event.stopPropagation();
+            const panel = document.getElementById('cityMultiPanel');
+            const isHidden = panel.classList.contains('hidden');
+            if (isHidden) {
+                panel.classList.remove('hidden');
+                renderCityMultiList();
+                setTimeout(() => {
+                    const inp = document.getElementById('citySearchInput');
+                    if (inp) inp.focus();
+                }, 20);
+            } else {
+                panel.classList.add('hidden');
+            }
+        }
+
+        function closeCityMultiDropdown() {
+            const panel = document.getElementById('cityMultiPanel');
+            if (panel && !panel.classList.contains('hidden')) {
+                panel.classList.add('hidden');
+            }
+        }
+
+        function updateCitySelectionUI() {
+            const citySelect = document.getElementById('citySelect');
+            const btnLabel = document.getElementById('cityMultiBtnLabel');
+            const countText = document.getElementById('citySelectedCountText');
+
+            if (selectedCities.size === 0) {
+                btnLabel.textContent = 'Select Cities';
+                if (countText) countText.textContent = '0 city selected';
+            } else if (selectedCities.size === 1) {
+                const onlyCity = Array.from(selectedCities)[0];
+                btnLabel.textContent = onlyCity;
+                if (countText) countText.textContent = '1 city selected';
+                if (citySelect && allAvailableCities.includes(onlyCity)) {
+                    citySelect.value = onlyCity;
+                }
+            } else {
+                btnLabel.textContent = `${selectedCities.size} Cities Selected`;
+                if (countText) countText.textContent = `${selectedCities.size} cities selected`;
+                if (citySelect) citySelect.value = 'ALL';
+            }
+        }
+
+        function handleSingleCityDropdownChange(val) {
+            selectedCities.clear();
+            if (val && val !== 'ALL') {
+                selectedCities.add(val);
+            }
+            updateCitySelectionUI();
+            renderCityMultiList();
+            applyFilters();
+        }
+
+        function renderCityMultiList() {
+            const listEl = document.getElementById('cityMultiCheckboxList');
+            if (!listEl) return;
+            const q = (document.getElementById('citySearchInput')?.value || '').trim().toLowerCase();
+            const matches = allAvailableCities.filter(c => c.toLowerCase().includes(q));
+
+            if (matches.length === 0) {
+                listEl.innerHTML = `<div class="text-xs text-slate-400 py-3 text-center">No matching city found.</div>`;
+                return;
+            }
+
+            listEl.innerHTML = matches.map(city => {
+                const checked = selectedCities.has(city) ? 'checked' : '';
+                const safeCity = city.replace(/'/g, "\\'");
+                return `
+                    <label class="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-elevated cursor-pointer text-xs text-slate-100">
+                        <input type="checkbox" ${checked} onchange="toggleCityCheckbox('${safeCity}', this.checked)"
+                            class="accent-teal-300 rounded cursor-pointer">
+                        <span class="truncate">${city}</span>
+                    </label>
+                `;
+            }).join('');
+        }
+
+        function toggleCityCheckbox(city, isChecked) {
+            if (isChecked) {
+                selectedCities.add(city);
+            } else {
+                selectedCities.delete(city);
+            }
+            if (selectedCities.size === 1) {
+                document.getElementById('citySelect').value = Array.from(selectedCities)[0];
+            } else if (selectedCities.size === 0) {
+                document.getElementById('citySelect').value = 'ALL';
+            }
+            updateCitySelectionUI();
+            applyFilters();
+        }
+
+        function selectAllVisibleCities() {
+            const q = (document.getElementById('citySearchInput')?.value || '').trim().toLowerCase();
+            allAvailableCities.filter(c => c.toLowerCase().includes(q)).forEach(c => selectedCities.add(c));
+            updateCitySelectionUI();
+            renderCityMultiList();
+            applyFilters();
+        }
+
+        function clearSelectedCities() {
+            selectedCities.clear();
+            document.getElementById('citySelect').value = 'ALL';
+            updateCitySelectionUI();
+            renderCityMultiList();
+            applyFilters();
+        }
+
         function refreshAllUI() {
             document.getElementById('statLive').textContent = liveRows.length;
             document.getElementById('statWithdrawn').textContent = withdrawnRows.length;
@@ -1711,6 +1862,7 @@
 
             const allCombined = liveRows.concat(withdrawnRows);
             const cities = Array.from(new Set(allCombined.map(r => getCell(r, 'CITY')).filter(Boolean))).sort();
+            allAvailableCities = cities;
             document.getElementById('statCities').textContent = cities.length;
 
             const citySelect = document.getElementById('citySelect');
@@ -1718,6 +1870,12 @@
             citySelect.innerHTML = `<option value="ALL">CITY: ALL CITIES (${cities.length})</option>` +
                 cities.map(c => `<option value="${c}">${c}</option>`).join('');
             if (cities.includes(currentCity)) citySelect.value = currentCity;
+
+            Array.from(selectedCities).forEach(sc => {
+                if (!cities.includes(sc)) selectedCities.delete(sc);
+            });
+            updateCitySelectionUI();
+            renderCityMultiList();
 
             renderVersionDistribution();
             renderHeader();
@@ -1785,6 +1943,21 @@
             applyFilters();
         }
 
+        // Supports searching single or multiple TIDs (comma/space/newline separated) as well as general keywords
+        function parseSearchTokens(rawQuery) {
+            const trimmed = String(rawQuery || '').trim();
+            if (!trimmed) return { isMultiTid: false, tokens: [] };
+            const splitParts = trimmed
+                .split(/[\s,;\n\r\t]+/)
+                .map(s => s.trim().toLowerCase())
+                .filter(Boolean);
+            const allNumericTokens = splitParts.length > 0 && splitParts.every(p => /^\d{4,15}$/.test(p));
+            if (allNumericTokens && (splitParts.length > 1 || /[,;\n\r\t]/.test(trimmed))) {
+                return { isMultiTid: true, tokens: splitParts };
+            }
+            return { isMultiTid: false, tokens: [trimmed.toLowerCase()] };
+        }
+
         function applyFilters() {
             let source = currentDataset === 'LIVE' ? liveRows : withdrawnRows;
             if (currentDataset === 'LIVE' && bankMatchActive) {
@@ -1792,6 +1965,7 @@
             }
 
             const q = document.getElementById('globalSearch').value.trim().toLowerCase();
+            const searchSpec = parseSearchTokens(q);
             const typeVal = document.getElementById('typeSelect').value;
             const cityVal = document.getElementById('citySelect').value;
             const engVal = document.getElementById('engineerSelect').value.trim().toLowerCase();
@@ -1802,11 +1976,26 @@
                     if (rVer !== selectedVersion) return false;
                 }
                 if (typeVal !== 'ALL' && detectRowType(r) !== typeVal) return false;
-                if (cityVal !== 'ALL' && getCell(r, 'CITY') !== cityVal) return false;
+
+                if (selectedCities.size > 0) {
+                    const rCity = getCell(r, 'CITY');
+                    if (!selectedCities.has(rCity)) return false;
+                } else if (cityVal !== 'ALL' && getCell(r, 'CITY') !== cityVal) {
+                    return false;
+                }
+
                 if (engVal && engVal !== 'all_engineer' && getCell(r, 'ROLL OUT BY').toLowerCase() !== engVal) return false;
+
                 if (q) {
-                    const hit = activeHeaders.some(h => getCell(r, h).toLowerCase().includes(q));
-                    if (!hit) return false;
+                    if (searchSpec.isMultiTid) {
+                        const rowTid = getTidFromRow(r).toLowerCase();
+                        const rowOldTid = getOldTidFromRow(r).toLowerCase();
+                        const matchesAnyTid = searchSpec.tokens.some(tok => rowTid === tok || rowOldTid === tok);
+                        if (!matchesAnyTid) return false;
+                    } else {
+                        const hit = activeHeaders.some(h => getCell(r, h).toLowerCase().includes(q));
+                        if (!hit) return false;
+                    }
                 }
                 return true;
             });
@@ -1925,8 +2114,17 @@
         }
 
         function exportSelectedCity() {
-            const cityVal = document.getElementById('citySelect').value;
             const source = currentDataset === 'LIVE' ? liveRows : withdrawnRows;
+            if (selectedCities.size > 0) {
+                const cityArr = Array.from(selectedCities);
+                const rows = source.filter(r => selectedCities.has(getCell(r, 'CITY')));
+                const label = cityArr.length === 1
+                    ? cityArr[0].replace(/\s+/g, '_')
+                    : `${cityArr.length}_Cities`;
+                writeRowsToCSV(rows, `City_${label}.csv`);
+                return;
+            }
+            const cityVal = document.getElementById('citySelect').value;
             const rows = cityVal === 'ALL' ? source : source.filter(r => getCell(r, 'CITY') === cityVal);
             writeRowsToCSV(rows, `City_${cityVal.replace(/\s+/g, '_')}.csv`);
         }
