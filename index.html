@@ -1045,7 +1045,6 @@
             reader.readAsArrayBuffer(file);
         }
 
-        // Strict LIVE TID match ONLY (ignores OLD TID completely)
         function findLiveRowByStrictTid(tidUpper) {
             const clean = String(tidUpper || '').trim().toUpperCase();
             if (!clean) return null;
@@ -1126,8 +1125,6 @@
             renderRolloutPreviewTable();
         }
 
-        // Preserve exact Excel values and match ONLY against LIVE TID (never OLD TID)
-        // If Excel row has SPECIAL FUNCTIONALITY, also carry Excel PURPOSE to update LIVE PURPOSE
         function buildPreviewRowFromExcel(rr, defaultEng, defaultDateIso) {
             const tidRaw = (getCell(rr, 'TID') || getCell(rr, 'TERMINAL ID') || '').trim();
             const tidUpper = tidRaw.toUpperCase();
@@ -1373,7 +1370,6 @@
             const activeIsoInitial = document.getElementById('rolloutPanelDatePicker').value;
 
             const allBuilt = rRows.map(rr => buildPreviewRowFromExcel(rr, activeEngInitial, activeIsoInitial));
-            // Keep ONLY rows whose TID matches LIVE terminal TID (OLD TID is ignored; unmatched rows are dropped)
             const onlyMatchedInLive = allBuilt.filter(item => item.tid && item.matched);
 
             lastSheetTotalRows = rRows.length;
@@ -1458,7 +1454,6 @@
             let updatedCount = 0;
 
             liveRows.forEach(row => {
-                // Match strictly against LIVE TID only (never OLD TID)
                 const tid = getTidFromRow(row);
                 if (!tid || !tidDetailsMap.has(tid)) return;
 
@@ -1477,7 +1472,6 @@
                     }
                     if (sDet.specialFunctionality) {
                         setCell(row, 'SPECIAL FUNCTIONALITY', sDet.specialFunctionality);
-                        // When Excel has SPECIAL FUNCTIONALITY, also update LIVE PURPOSE with Excel PURPOSE
                         if (sDet.purpose) {
                             setCell(row, 'PURPOSE', sDet.purpose);
                         }
@@ -1814,6 +1808,11 @@
             }).join('');
         }
 
+        // Copy row as tab-separated values so pasting directly into Excel/Sheets aligns column-by-column
+        function formatRowTabSeparated(row) {
+            return activeHeaders.map(h => getCell(row, h)).join('\t');
+        }
+
         function formatRowLine(row) {
             return activeHeaders.map(h => `${h.trim()}: ${getCell(row, h) || '-'}`).join(' | ');
         }
@@ -1821,7 +1820,7 @@
         function copyRow(idx) {
             const row = filteredRows[idx];
             if (!row) return;
-            navigator.clipboard.writeText(formatRowLine(row)).then(() => showToast('Row copied'));
+            navigator.clipboard.writeText(formatRowTabSeparated(row)).then(() => showToast('Row copied for sheet paste'));
         }
 
         function openDetailModal(idx) {
@@ -1834,7 +1833,7 @@
                 </div>
             `).join('');
             document.getElementById('modalCopyBtn').onclick = () => {
-                navigator.clipboard.writeText(formatRowLine(row)).then(() => showToast('All fields copied'));
+                navigator.clipboard.writeText(formatRowTabSeparated(row)).then(() => showToast('Row copied for sheet paste'));
             };
             const m = document.getElementById('detailModal');
             m.classList.remove('hidden');
