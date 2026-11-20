@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>POS Terminal Command Center</title>
+    <title>City Dashboard · POS Terminal Hub</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%232dd4bf'/%3E%3Cstop offset='.55' stop-color='%23fbbf24'/%3E%3Cstop offset='1' stop-color='%23a855f7'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='%230a1224'/%3E%3Cpath d='M32 8 53 20v24L32 56 11 44V20z' fill='none' stroke='url(%23g)' stroke-width='3.5' stroke-linejoin='round'/%3E%3Cpath d='M20 42V30h6v12m3 0V24h7v18m3 0V33h6v9' fill='none' stroke='url(%23g)' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -40,14 +42,303 @@
             border: 1px solid #21314f;
             box-shadow: 0 12px 28px -14px rgba(0, 0, 0, 0.75);
         }
+        /* ===== CITY PICKER — aurora glass design ===== */
         #cityMultiPanel {
             position: fixed;
             z-index: 9999;
+            overflow: hidden;
+            border-radius: 20px;
+            background:
+                radial-gradient(120% 70% at 0% 0%, rgba(45, 212, 191, 0.16), transparent 55%),
+                radial-gradient(110% 70% at 100% 100%, rgba(168, 85, 247, 0.16), transparent 55%),
+                linear-gradient(165deg, rgba(15, 24, 44, 0.97), rgba(7, 11, 22, 0.98));
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            box-shadow:
+                0 30px 70px -14px rgba(0, 0, 0, 0.9),
+                0 0 0 1px rgba(45, 212, 191, 0.18),
+                0 0 44px -10px rgba(45, 212, 191, 0.35),
+                inset 0 1px 0 rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(18px) saturate(140%);
+            animation: cityPanelIn 0.22s cubic-bezier(.2,.9,.3,1.2);
         }
+        #cityMultiPanel.hidden { display: none; }
+        #cityMultiPanel::before {            /* animated aurora line on top */
+            content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+            background: linear-gradient(90deg, #2dd4bf, #fbbf24, #a855f7, #2dd4bf);
+            background-size: 220% 100%;
+            animation: cityAurora 4s linear infinite;
+        }
+        @keyframes cityAurora { to { background-position: 220% 0; } }
+        @keyframes cityPanelIn {
+            from { opacity: 0; transform: translateY(-10px) scale(0.96); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .city-head { display: flex; align-items: center; gap: 10px; }
+        .city-head-icon {
+            width: 34px; height: 34px; border-radius: 11px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            color: #04201c; font-size: 14px;
+            background: linear-gradient(135deg, #5eead4, #fbbf24);
+            box-shadow: 0 6px 18px -4px rgba(45, 212, 191, 0.6);
+        }
+        .city-head-title { font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+            background: linear-gradient(90deg, #99f6e4, #fde68a, #d8b4fe);
+            -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .city-head-sub { font-size: 10.5px; color: #7f92b5; margin-top: 1px; }
+
+        #citySearchInput {
+            background: rgba(8, 14, 28, 0.75) !important;
+            border: 1px solid rgba(148, 163, 184, 0.2) !important;
+            border-radius: 13px !important;
+            padding-top: 9px !important; padding-bottom: 9px !important;
+            transition: border-color .15s, box-shadow .15s;
+        }
+        #citySearchInput:focus {
+            border-color: #2dd4bf !important;
+            box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.18), 0 0 22px -6px rgba(45, 212, 191, 0.5);
+        }
+
+        #citySelectedCountText {
+            background: rgba(45, 212, 191, 0.12);
+            border: 1px solid rgba(45, 212, 191, 0.35);
+            border-radius: 999px; padding: 3px 11px;
+            font-size: 11px; font-weight: 700; color: #5eead4;
+        }
+        .city-chip {
+            border-radius: 999px; padding: 3px 11px; font-size: 11px; font-weight: 700;
+            border: 1px solid; transition: all .15s; text-decoration: none !important;
+        }
+        .city-chip-amber { color: #fde68a; border-color: rgba(251, 191, 36, 0.4); background: rgba(251, 191, 36, 0.08); }
+        .city-chip-amber:hover { background: rgba(251, 191, 36, 0.2); transform: translateY(-1px); }
+        .city-chip-rose { color: #fda4af; border-color: rgba(251, 113, 133, 0.4); background: rgba(251, 113, 133, 0.08); }
+        .city-chip-rose:hover { background: rgba(251, 113, 133, 0.2); transform: translateY(-1px); }
+
+        #cityMultiCheckboxList {
+            scrollbar-width: thin; scrollbar-color: rgba(45,212,191,.4) transparent;
+            padding: 2px 4px 2px 0;
+        }
+        #cityMultiCheckboxList::-webkit-scrollbar { width: 5px; }
+        #cityMultiCheckboxList::-webkit-scrollbar-track { background: transparent; }
+        #cityMultiCheckboxList::-webkit-scrollbar-thumb { background: linear-gradient(#2dd4bf, #a855f7); border-radius: 999px; }
+
+        #cityMultiCheckboxList > div {
+            position: relative;
+            display: flex; align-items: center; gap: 11px;
+            padding: 8px 11px !important;
+            margin-bottom: 5px;
+            border-radius: 13px;
+            border: 1px solid rgba(148, 163, 184, 0.09);
+            background: rgba(255, 255, 255, 0.025);
+            font-size: 12.5px; font-weight: 600; letter-spacing: .02em;
+            transition: transform .14s ease, background .14s ease, border-color .14s ease, box-shadow .14s ease;
+        }
+        #cityMultiCheckboxList > div:hover {
+            transform: translateX(3px);
+            background: rgba(45, 212, 191, 0.08);
+            border-color: rgba(45, 212, 191, 0.3);
+        }
+        #cityMultiCheckboxList > div:has(input:checked) {
+            background: linear-gradient(90deg, rgba(45, 212, 191, 0.2), rgba(168, 85, 247, 0.12));
+            border-color: rgba(45, 212, 191, 0.55);
+            box-shadow: 0 8px 20px -10px rgba(45, 212, 191, 0.6);
+            color: #ccfbf1;
+        }
+        #cityMultiCheckboxList > div:has(input:checked)::before {   /* glowing side bar */
+            content: ""; position: absolute; left: -1px; top: 20%; bottom: 20%; width: 3px;
+            border-radius: 3px; background: linear-gradient(#5eead4, #fbbf24);
+            box-shadow: 0 0 10px #2dd4bf;
+        }
+        .city-ava {
+            width: 28px; height: 28px; border-radius: 9px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 800; color: #cbd5e1;
+            background: linear-gradient(135deg, #1b2a48, #121c33);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            transition: all .14s ease;
+        }
+        #cityMultiCheckboxList > div:hover .city-ava { color: #5eead4; border-color: rgba(45,212,191,.5); }
+        #cityMultiCheckboxList > div:has(input:checked) .city-ava {
+            color: #04201c; border-color: transparent;
+            background: linear-gradient(135deg, #5eead4, #fbbf24);
+        }
+
+        #cityMultiCheckboxList input[type="checkbox"] {
+            -webkit-appearance: none; appearance: none;
+            order: 3; margin-left: auto;
+            width: 20px; height: 20px; flex-shrink: 0; border-radius: 999px;
+            border: 1.5px solid #3b4f78; background: rgba(8, 14, 28, 0.8);
+            cursor: pointer; position: relative; transition: all .15s ease;
+        }
+        #cityMultiCheckboxList input[type="checkbox"]:hover { border-color: #2dd4bf; }
+        #cityMultiCheckboxList input[type="checkbox"]:checked {
+            background: linear-gradient(135deg, #2dd4bf, #34d399);
+            border-color: transparent; box-shadow: 0 0 12px rgba(45, 212, 191, 0.7);
+        }
+        #cityMultiCheckboxList input[type="checkbox"]:checked::after {
+            content: ""; position: absolute; left: 6.5px; top: 3px;
+            width: 4px; height: 9px; border: solid #04201c;
+            border-width: 0 2.4px 2.4px 0; transform: rotate(45deg);
+        }
+
+        .city-foot { border-top: 1px solid rgba(148, 163, 184, 0.14) !important; }
+        .city-btn-done {
+            border-radius: 12px; padding: 9px 18px; font-size: 12px; font-weight: 700; color: #cbd5e1;
+            background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(148, 163, 184, 0.25);
+            transition: all .15s;
+        }
+        .city-btn-done:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+        .city-btn-export {
+            position: relative; overflow: hidden;
+            border-radius: 12px; padding: 9px 16px; font-size: 12px; font-weight: 800; color: #1c1300;
+            background: linear-gradient(135deg, #fde68a, #fbbf24 55%, #f59e0b);
+            box-shadow: 0 10px 24px -8px rgba(251, 191, 36, 0.7);
+            transition: transform .15s, box-shadow .15s;
+        }
+        .city-btn-export:hover { transform: translateY(-2px); box-shadow: 0 14px 28px -8px rgba(251, 191, 36, 0.85); }
+        .city-btn-export::after {                /* shimmer */
+            content: ""; position: absolute; top: 0; bottom: 0; width: 40%; left: -60%;
+            background: linear-gradient(100deg, transparent, rgba(255,255,255,.55), transparent);
+            transform: skewX(-20deg); animation: cityShine 3.2s ease-in-out infinite;
+        }
+        @keyframes cityShine { 0%, 55% { left: -60%; } 100% { left: 130%; } }
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #070b14; }
         ::-webkit-scrollbar-thumb { background: #263859; border-radius: 999px; }
         ::-webkit-scrollbar-thumb:hover { background: #2dd4bf; }
+
+        /* =====================================================
+           MIDNIGHT AURORA THEME  (visual layer only — no logic)
+           ===================================================== */
+        html body { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: .005em; }
+        html body h1, html body .text-2xl, html body .text-xl { font-family: 'Space Grotesk', 'Inter', sans-serif; }
+        html body #liveClock { font-family: 'JetBrains Mono', ui-monospace, monospace; text-shadow: 0 0 18px rgba(251,191,36,.55); }
+
+        /* ambient background: aurora + fine dot grid */
+        html body {
+            background:
+                radial-gradient(900px 520px at 8% -6%, rgba(45,212,191,.16), transparent 60%),
+                radial-gradient(800px 520px at 96% 4%, rgba(251,191,36,.10), transparent 60%),
+                radial-gradient(900px 600px at 50% 112%, rgba(168,85,247,.16), transparent 60%),
+                #050810;
+            background-attachment: fixed;
+        }
+        body::before {
+            content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+            background-image: radial-gradient(rgba(148,163,184,.10) 1px, transparent 1px);
+            background-size: 26px 26px;
+            -webkit-mask-image: radial-gradient(ellipse at 50% 0%, #000 25%, transparent 78%);
+                    mask-image: radial-gradient(ellipse at 50% 0%, #000 25%, transparent 78%);
+        }
+        main, header { position: relative; z-index: 1; }
+        header.sticky { z-index: 40; }
+
+        /* header */
+        html body header.glass-card {
+            background: linear-gradient(180deg, rgba(10,16,31,.92), rgba(7,11,22,.86));
+            border: 0; border-bottom: 1px solid rgba(148,163,184,.14);
+            box-shadow: 0 18px 40px -22px rgba(0,0,0,.9);
+        }
+        header.glass-card::after {
+            content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+            background: linear-gradient(90deg, transparent, #2dd4bf, #fbbf24, #a855f7, transparent);
+            background-size: 200% 100%; animation: auroraSlide 7s linear infinite; opacity: .9;
+        }
+        @keyframes auroraSlide { to { background-position: 200% 0; } }
+        header .w-9.h-9 { box-shadow: 0 0 0 1px rgba(45,212,191,.35), 0 0 26px -2px rgba(45,212,191,.55); animation: logoPulse 3.4s ease-in-out infinite; }
+        @keyframes logoPulse { 50% { box-shadow: 0 0 0 1px rgba(251,191,36,.4), 0 0 30px 0 rgba(251,191,36,.45); } }
+
+        /* cards */
+        html body .glass-card {
+            position: relative;
+            background: linear-gradient(155deg, rgba(17,27,48,.78), rgba(8,13,25,.82));
+            border: 1px solid rgba(148,163,184,.13);
+            border-radius: 18px;
+            box-shadow: 0 18px 40px -22px rgba(0,0,0,.9), inset 0 1px 0 rgba(255,255,255,.05);
+            transition: transform .22s ease, border-color .22s ease, box-shadow .22s ease;
+        }
+        main > section.glass-card:hover, main > div.glass-card:hover { border-color: rgba(45,212,191,.22); }
+
+        /* KPI cards (first four in metrics grid) get colored aurora edge */
+        main > div.grid > .glass-card { overflow: hidden; }
+        main > div.grid > .glass-card:nth-child(-n+4)::before {
+            content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+            background: linear-gradient(90deg, var(--k), transparent);
+        }
+        main > div.grid > .glass-card:nth-child(-n+4)::after {
+            content: ""; position: absolute; right: -30px; top: -30px; width: 110px; height: 110px; border-radius: 50%;
+            background: radial-gradient(circle, var(--k), transparent 70%); opacity: .18; pointer-events: none;
+        }
+        main > div.grid > .glass-card:nth-child(1) { --k: #2dd4bf; }
+        main > div.grid > .glass-card:nth-child(2) { --k: #fb7185; }
+        main > div.grid > .glass-card:nth-child(3) { --k: #fbbf24; }
+        main > div.grid > .glass-card:nth-child(4) { --k: #a855f7; }
+        main > div.grid > .glass-card:nth-child(-n+4):hover { transform: translateY(-4px); box-shadow: 0 24px 44px -20px var(--k), inset 0 1px 0 rgba(255,255,255,.06); }
+        main > div.grid > .glass-card:nth-child(-n+4) .text-2xl {
+            font-size: 1.9rem; line-height: 1.1; font-weight: 700;
+            background: linear-gradient(180deg, #fff, #b6c4dd); -webkit-background-clip: text; background-clip: text; color: transparent;
+        }
+
+        /* inputs, selects */
+        html body input[type="text"], html body input[type="search"], html body select, html body textarea {
+            background-color: rgba(8,14,28,.7); border-color: rgba(148,163,184,.2);
+            transition: border-color .15s, box-shadow .15s, background-color .15s;
+        }
+        html body input[type="text"]:focus, html body select:focus, html body textarea:focus {
+            border-color: #2dd4bf; box-shadow: 0 0 0 3px rgba(45,212,191,.16), 0 0 20px -8px rgba(45,212,191,.6);
+        }
+        html body #globalSearch { border-radius: 12px; }
+
+        /* buttons / upload labels */
+        html body button, html body label.cursor-pointer { transition: transform .15s ease, box-shadow .15s ease, background-color .15s, border-color .15s, filter .15s; }
+        html body button:not(:disabled):hover, html body label.cursor-pointer:hover { transform: translateY(-2px); box-shadow: 0 10px 22px -10px rgba(45,212,191,.55); }
+        html body button:not(:disabled):active, html body label.cursor-pointer:active { transform: translateY(0) scale(.98); }
+        html body button:disabled { cursor: not-allowed; filter: saturate(.5); }
+        html body header button, html body header label.cursor-pointer, html body main button.rounded-lg { border-radius: 11px; }
+
+        /* version cards */
+        #versionGrid > button, #versionGrid > div { border-radius: 14px; }
+        #versionGrid > button:hover { transform: translateY(-3px); border-color: rgba(251,191,36,.6); box-shadow: 0 16px 30px -16px rgba(251,191,36,.6); }
+
+        /* main data table */
+        main div.overflow-x-auto { scrollbar-width: thin; }
+        html body table { border-collapse: separate; border-spacing: 0; }
+        html body thead.sticky th, html body thead th {
+            background: linear-gradient(180deg, #15213a, #0e1729) !important;
+            color: #fcd34d; font-size: 10.5px; font-weight: 800; letter-spacing: .12em;
+            border-bottom: 1px solid rgba(251,191,36,.28) !important;
+        }
+        html body tbody tr { transition: background .12s ease, box-shadow .12s ease; }
+        html body tbody tr:nth-child(even) { background: rgba(255,255,255,.018); }
+        html body tbody tr:hover { background: linear-gradient(90deg, rgba(45,212,191,.12), rgba(45,212,191,.03)) !important; box-shadow: inset 3px 0 0 #2dd4bf; }
+        html body tbody td { border-color: rgba(148,163,184,.08); font-variant-numeric: tabular-nums; }
+        html body .overflow-x-auto.rounded-lg.border, main .glass-card.overflow-hidden { border-radius: 18px; }
+
+        /* modals */
+        #engineerModal, #detailModal { background: rgba(3,6,14,.72); backdrop-filter: blur(8px); }
+        #engineerModal > .glass-card, #detailModal > .glass-card {
+            border: 1px solid rgba(45,212,191,.28); overflow: hidden;
+            box-shadow: 0 40px 90px -20px rgba(0,0,0,.95), 0 0 60px -20px rgba(45,212,191,.4);
+            animation: modalPop .24s cubic-bezier(.2,.9,.3,1.15);
+        }
+        #engineerModal > .glass-card::before, #detailModal > .glass-card::before {
+            content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; z-index: 2;
+            background: linear-gradient(90deg, #2dd4bf, #fbbf24, #a855f7);
+        }
+        @keyframes modalPop { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: none; } }
+
+        /* page entrance */
+        main > * { animation: riseIn .55s cubic-bezier(.2,.8,.2,1) both; }
+        main > *:nth-child(2) { animation-delay: .06s; } main > *:nth-child(3) { animation-delay: .12s; }
+        main > *:nth-child(4) { animation-delay: .18s; } main > *:nth-child(n+5) { animation-delay: .24s; }
+        @keyframes riseIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+        /* scrollbars */
+        ::-webkit-scrollbar-track { background: rgba(7,11,20,.8); }
+        ::-webkit-scrollbar-thumb { background: linear-gradient(#2dd4bf, #6d5bd0); border-radius: 999px; }
+        ::-webkit-scrollbar-thumb:hover { background: linear-gradient(#5eead4, #a855f7); }
+        html body ::selection { background: #2dd4bf; color: #04201c; }
     </style>
 </head>
 <body class="min-h-screen font-sans antialiased selection:bg-teal-300 selection:text-slate-950">
@@ -56,12 +347,24 @@
     <header class="glass-card border-b border-line sticky top-0 z-40">
         <div class="max-w-[1850px] mx-auto px-4 lg:px-6 py-3 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
             <div class="flex flex-wrap items-center gap-3">
-                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-teal-400/20 via-amber-300/10 to-purple-500/20 border border-teal-400/40 flex items-center justify-center text-teal-300">
-                    <i class="fa-solid fa-microchip"></i>
+                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-teal-400/20 via-amber-300/10 to-purple-500/20 border border-teal-400/40 flex items-center justify-center text-teal-300" style="width:48px;height:48px;border-radius:15px;flex-shrink:0">
+                    <svg viewBox="0 0 64 64" width="30" height="30" aria-label="City Dashboard logo" role="img">
+                        <defs>
+                            <linearGradient id="cdLogoG" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0" stop-color="#2dd4bf"/>
+                                <stop offset=".55" stop-color="#fbbf24"/>
+                                <stop offset="1" stop-color="#a855f7"/>
+                            </linearGradient>
+                        </defs>
+                        <path d="M32 5 56 18.5v27L32 59 8 45.5v-27z" fill="rgba(45,212,191,.08)" stroke="url(#cdLogoG)" stroke-width="3.2" stroke-linejoin="round"/>
+                        <path d="M19 43V32h6.5v11M29 43V23h7.5v20M40.5 43V30H47v13" fill="none" stroke="url(#cdLogoG)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M16 43h32" stroke="url(#cdLogoG)" stroke-width="3" stroke-linecap="round"/>
+                        <circle cx="32.7" cy="15.5" r="2.6" fill="#fbbf24"/>
+                    </svg>
                 </div>
                 <div>
                     <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-teal-300 via-amber-200 to-purple-300 bg-clip-text text-transparent">
-                        Terminal Command Center
+                        City Dashboard
                     </h1>
                     <div class="flex items-center gap-2 text-[11px] font-semibold tracking-wider text-teal-300 uppercase">
                         <span class="w-2 h-2 rounded-full bg-teal-300 animate-ping"></span>
@@ -349,32 +652,37 @@
 
                         <!-- Top-Layered CITY Dropdown Panel (Always floats above table header) -->
                         <div id="cityMultiPanel"
-                            class="hidden w-80 bg-surface border border-teal-300/50 rounded-xl shadow-2xl p-3 space-y-2.5">
-                            <div class="relative">
-                                <i class="fa-solid fa-magnifying-glass text-teal-300/70 text-[11px] absolute left-2.5 top-1/2 -translate-y-1/2"></i>
-                                <input id="citySearchInput" type="text" oninput="renderCityMultiList()" placeholder="Search city name..."
-                                    class="w-full bg-elevated border border-line focus:border-teal-300 rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-white placeholder-slate-400 outline-none">
+                            class="hidden w-80 p-4 space-y-3">
+                            <div class="city-head">
+                                <div class="city-head-icon"><i class="fa-solid fa-location-dot"></i></div>
+                                <div>
+                                    <div class="city-head-title">Select Cities</div>
+                                    <div class="city-head-sub">Search, pick one or many, then export</div>
+                                </div>
                             </div>
 
-                            <div class="flex items-center justify-between text-[11px] px-0.5">
-                                <span id="citySelectedCountText" class="text-teal-300 font-semibold">All cities (0 selected)</span>
-                                <div class="flex items-center gap-2">
-                                    <button type="button" onclick="selectAllVisibleCities()" class="text-amber-200 hover:underline">Select All</button>
-                                    <button type="button" onclick="clearSelectedCities()" class="text-rose-300 hover:underline">All Cities</button>
+                            <div class="relative">
+                                <i class="fa-solid fa-magnifying-glass text-teal-300/80 text-[12px] absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                                <input id="citySearchInput" type="text" oninput="renderCityMultiList()" placeholder="Search city name..."
+                                    class="w-full bg-elevated border border-line rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-400 outline-none">
+                            </div>
+
+                            <div class="flex items-center justify-between gap-2">
+                                <span id="citySelectedCountText">All cities (0 selected)</span>
+                                <div class="flex items-center gap-1.5">
+                                    <button type="button" onclick="selectAllVisibleCities()" class="city-chip city-chip-amber">Select All</button>
+                                    <button type="button" onclick="clearSelectedCities()" class="city-chip city-chip-rose">All Cities</button>
                                 </div>
                             </div>
 
                             <div id="cityMultiCheckboxList"
-                                style="display: block; max-height: 240px; overflow-y: auto;"
-                                class="space-y-1 pr-1 divide-y divide-line/40"></div>
+                                style="display: block; max-height: 260px; overflow-y: auto;"></div>
 
-                            <div class="pt-2 border-t border-line flex items-center justify-between gap-2">
-                                <button type="button" onclick="closeCityMultiDropdown()"
-                                    class="bg-elevated hover:bg-slate-800 text-slate-200 border border-line px-2.5 py-1.5 rounded-lg text-xs font-semibold">
+                            <div class="city-foot pt-3 flex items-center justify-between gap-2">
+                                <button type="button" onclick="closeCityMultiDropdown()" class="city-btn-done">
                                     Done
                                 </button>
-                                <button type="button" onclick="exportSelectedCity()"
-                                    class="bg-amber-300 hover:bg-amber-200 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5">
+                                <button type="button" onclick="exportSelectedCity()" class="city-btn-export flex items-center gap-1.5">
                                     <i class="fa-solid fa-file-arrow-down"></i>
                                     <span>Export Selected</span>
                                 </button>
@@ -548,13 +856,15 @@
 
         document.addEventListener('click', (e) => {
             const wrapper = document.getElementById('cityFilterWrapper');
-            if (wrapper && !wrapper.contains(e.target)) {
+            const cityPanelEl = document.getElementById('cityMultiPanel');
+            if (wrapper && !wrapper.contains(e.target) && !(cityPanelEl && cityPanelEl.contains(e.target))) {
                 closeCityMultiDropdown();
             }
         });
 
-        window.addEventListener('scroll', () => {
+        window.addEventListener('scroll', (ev) => {
             const panel = document.getElementById('cityMultiPanel');
+            if (panel && ev.target instanceof Node && panel.contains(ev.target)) return;
             if (panel && !panel.classList.contains('hidden')) {
                 positionCityMultiPanel();
             }
@@ -1739,16 +2049,35 @@
             const panel = document.getElementById('cityMultiPanel');
             if (!trigger || !panel || panel.classList.contains('hidden')) return;
 
+            // Move panel to <body> so position:fixed is relative to the real viewport
+            // (the toolbar card uses backdrop-filter, which would otherwise offset it).
+            if (panel.parentElement !== document.body) document.body.appendChild(panel);
+
+            const list = document.getElementById('cityMultiCheckboxList');
             const rect = trigger.getBoundingClientRect();
+            const margin = 12;
             const panelWidth = Math.min(320, window.innerWidth - 24);
             let left = rect.left;
-            if (left + panelWidth > window.innerWidth - 12) {
-                left = Math.max(12, window.innerWidth - panelWidth - 12);
+            if (left + panelWidth > window.innerWidth - margin) {
+                left = Math.max(margin, window.innerWidth - panelWidth - margin);
             }
-
-            const top = rect.bottom + 6;
             panel.style.width = `${panelWidth}px`;
             panel.style.left = `${left}px`;
+
+            // Height of everything except the scrolling list
+            list.style.maxHeight = '0px';
+            const chrome = panel.offsetHeight;
+            const spaceBelow = window.innerHeight - rect.bottom - 6 - margin;
+            const spaceAbove = rect.top - 6 - margin;
+            const wanted = Math.min(list.scrollHeight, 300);
+            const openUp = (chrome + wanted > spaceBelow) && (spaceAbove > spaceBelow);
+            const space = openUp ? spaceAbove : spaceBelow;
+            const listMax = Math.max(120, Math.min(300, space - chrome));
+            list.style.maxHeight = `${listMax}px`;
+
+            const panelH = panel.offsetHeight;
+            let top = openUp ? rect.top - 6 - panelH : rect.bottom + 6;
+            top = Math.max(margin, Math.min(top, window.innerHeight - panelH - margin));
             panel.style.top = `${top}px`;
         }
 
@@ -1760,6 +2089,7 @@
                 panel.classList.remove('hidden');
                 positionCityMultiPanel();
                 renderCityMultiList();
+                positionCityMultiPanel();
                 setTimeout(() => {
                     const inp = document.getElementById('citySearchInput');
                     if (inp) inp.focus();
@@ -1804,6 +2134,7 @@
 
             if (matches.length === 0) {
                 listEl.innerHTML = `<div class="text-xs text-slate-400 py-3 text-center">No matching city found.</div>`;
+                positionCityMultiPanel();
                 return;
             }
 
@@ -1813,15 +2144,17 @@
                 const escapedCity = city.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
                 return `
                     <div onclick="toggleCityByNameFromRow(this, event)" data-city-val="${encodeURIComponent(city)}"
-                        class="flex items-center gap-2.5 py-1.5 px-2 rounded hover:bg-elevated cursor-pointer text-xs text-slate-100 select-none">
+                        class="flex items-center gap-2.5 py-1.5 px-2 rounded cursor-pointer text-xs text-slate-100 select-none">
+                        <span class="city-ava">${escapedCity.trim().charAt(0).toUpperCase()}</span>
                         <input id="${inputId}" type="checkbox" ${checked}
                             onclick="event.stopPropagation()"
                             onchange="onCityCheckboxChange(this, decodeURIComponent(this.parentElement.getAttribute('data-city-val')))"
-                            class="accent-teal-300 rounded cursor-pointer shrink-0">
+                            class="cursor-pointer shrink-0">
                         <span class="truncate flex-1">${escapedCity}</span>
                     </div>
                 `;
             }).join('');
+            positionCityMultiPanel();
         }
 
         function toggleCityByNameFromRow(rowEl, event) {
