@@ -570,6 +570,17 @@
             );
         }
 
+        // Appends ",SPECIAL FUNCTIONALITY" to the existing LIVE PURPOSE (e.g. "REPLACE" -> "REPLACE,SPECIAL FUNCTIONALITY")
+        function appendSpecialFunctionalityToPurpose(basePurpose) {
+            const cleanBase = String(basePurpose || '').trim();
+            if (!cleanBase) return 'SPECIAL FUNCTIONALITY';
+            const parts = cleanBase.split(',').map(p => p.trim().toUpperCase());
+            if (parts.includes('SPECIAL FUNCTIONALITY')) {
+                return cleanBase;
+            }
+            return `${cleanBase},SPECIAL FUNCTIONALITY`;
+        }
+
         // Detects EMI tenures from Month 3..Month 36 columns (ignores 0 or blank values)
         function detectEmiSpecialFunctionalityFromRow(rr) {
             const activeTenures = [];
@@ -1180,10 +1191,12 @@
             const emiTenureSpecialFunc = detectEmiSpecialFunctionalityFromRow(rr);
             const excelSpecialFunc = directSpecialFunc || emiTenureSpecialFunc;
 
-            const excelPurpose = (
-                getCell(rr, 'PURPOSE') ||
-                ''
-            ).trim();
+            const liveExistingPurpose = liveMatch ? getCell(liveMatch, 'PURPOSE') : '';
+            const excelPurpose = (getCell(rr, 'PURPOSE') || '').trim();
+            const basePurpose = liveExistingPurpose || excelPurpose;
+            const computedPurpose = excelSpecialFunc
+                ? appendSpecialFunctionalityToPurpose(basePurpose)
+                : '';
 
             const excelRollDate = (
                 getCell(rr, 'ROLL OUT DATE') ||
@@ -1222,7 +1235,7 @@
                 status: statusRaw ? normalizeCaseText(statusRaw) : '',
                 appVersion: excelAppVer,
                 specialFunctionality: excelSpecialFunc,
-                purpose: excelSpecialFunc ? excelPurpose : '',
+                purpose: computedPurpose,
                 rollOutDate: excelRollDate,
                 rollOutBy: excelEng,
                 qr: excelQr,
@@ -1307,7 +1320,7 @@
                         </td>
                         <td class="py-2 px-2.5 whitespace-nowrap">
                             <input type="text" value="${item.purpose || ''}" placeholder="${liveFound ? (getCell(liveFound, 'PURPOSE') || 'Keep LIVE') : 'Purpose...'}" onchange="updatePreviewField(${idx}, 'purpose', this.value)"
-                                class="bg-elevated border ${item.specialFunctionality && item.purpose ? 'border-teal-300/60' : 'border-line'} rounded px-2 py-1 text-xs text-teal-200 w-28 outline-none">
+                                class="bg-elevated border ${item.specialFunctionality && item.purpose ? 'border-teal-300/60' : 'border-line'} rounded px-2 py-1 text-xs text-teal-200 w-44 outline-none">
                         </td>
                         <td class="py-2 px-2.5 whitespace-nowrap">
                             <input type="text" value="${item.rollOutDate || ''}" placeholder="${liveFound ? (getCell(liveFound, 'ROLL OUT DATE') || 'Keep LIVE') : 'Date...'}" onchange="updatePreviewField(${idx}, 'rollOutDate', this.value)"
@@ -1334,7 +1347,13 @@
 
         function updatePreviewField(idx, field, val) {
             if (!rolloutPreviewRows[idx]) return;
-            rolloutPreviewRows[idx][field] = String(val || '').trim();
+            const trimmed = String(val || '').trim();
+            rolloutPreviewRows[idx][field] = trimmed;
+            if (field === 'specialFunctionality' && trimmed) {
+                const liveFound = findLiveRowByStrictTid(rolloutPreviewRows[idx].tid);
+                const livePurpose = liveFound ? getCell(liveFound, 'PURPOSE') : rolloutPreviewRows[idx].purpose;
+                rolloutPreviewRows[idx].purpose = appendSpecialFunctionalityToPurpose(livePurpose);
+            }
             renderRolloutPreviewTable();
         }
 
@@ -1508,9 +1527,11 @@
                     }
                     if (sDet.specialFunctionality) {
                         setCell(row, 'SPECIAL FUNCTIONALITY', sDet.specialFunctionality);
-                        if (sDet.purpose) {
-                            setCell(row, 'PURPOSE', sDet.purpose);
-                        }
+                        const currentLivePurpose = getCell(row, 'PURPOSE');
+                        const finalPurpose = sDet.purpose
+                            ? sDet.purpose
+                            : appendSpecialFunctionalityToPurpose(currentLivePurpose);
+                        setCell(row, 'PURPOSE', finalPurpose);
                     }
                     if (sDet.qr) {
                         setCell(row, 'QR', sDet.qr);
@@ -1542,9 +1563,11 @@
 
                     if (sDet.specialFunctionality) {
                         setCell(row, 'SPECIAL FUNCTIONALITY', sDet.specialFunctionality);
-                        if (sDet.purpose) {
-                            setCell(row, 'PURPOSE', sDet.purpose);
-                        }
+                        const currentLivePurpose = getCell(row, 'PURPOSE');
+                        const finalPurpose = sDet.purpose
+                            ? sDet.purpose
+                            : appendSpecialFunctionalityToPurpose(currentLivePurpose);
+                        setCell(row, 'PURPOSE', finalPurpose);
                     }
                     if (sDet.qr) {
                         setCell(row, 'QR', sDet.qr);
