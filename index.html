@@ -331,7 +331,7 @@
                         <option value="FOR TEST">FOR TEST</option>
                     </select>
 
-                    <!-- 2nd Mark: CITY: ALL CITIES (77) Dropdown with Search + Visible Multi-City Name Selection -->
+                    <!-- 2nd Mark: CITY: ALL CITIES (77) Dropdown with Search + Visible City Name List -->
                     <div id="cityFilterWrapper" class="relative flex items-center gap-1.5">
                         <button type="button" onclick="toggleCityMultiDropdown(event)" id="cityDropdownTrigger"
                             class="bg-elevated hover:bg-slate-800 border border-line focus:border-teal-300 rounded-lg px-3 py-2 text-xs font-semibold text-slate-100 flex items-center justify-between gap-2.5 min-w-[195px] outline-none transition">
@@ -360,7 +360,9 @@
                                 </div>
                             </div>
 
-                            <div id="cityMultiCheckboxList" class="max-h-60 overflow-y-auto space-y-1 pr-1 divide-y divide-line/40"></div>
+                            <div id="cityMultiCheckboxList"
+                                style="display: block; max-height: 240px; overflow-y: auto;"
+                                class="space-y-1 pr-1 divide-y divide-line/40"></div>
 
                             <div class="pt-2 border-t border-line flex items-center justify-between gap-2">
                                 <button type="button" onclick="closeCityMultiDropdown()"
@@ -1771,19 +1773,31 @@
             listEl.innerHTML = matches.map((city, idx) => {
                 const checked = selectedCities.has(city) ? 'checked' : '';
                 const inputId = `city-chk-${idx}`;
+                const escapedCity = city.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
                 return `
-                    <label for="${inputId}" class="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-elevated cursor-pointer text-xs text-slate-100 select-none">
-                        <input id="${inputId}" type="checkbox" data-city="${encodeURIComponent(city)}" ${checked}
-                            onchange="onCityCheckboxChange(this)"
+                    <div onclick="toggleCityByNameFromRow(this, event)" data-city-val="${encodeURIComponent(city)}"
+                        class="flex items-center gap-2.5 py-1.5 px-2 rounded hover:bg-elevated cursor-pointer text-xs text-slate-100 select-none">
+                        <input id="${inputId}" type="checkbox" ${checked}
+                            onclick="event.stopPropagation()"
+                            onchange="onCityCheckboxChange(this, decodeURIComponent(this.parentElement.getAttribute('data-city-val')))"
                             class="accent-teal-300 rounded cursor-pointer shrink-0">
-                        <span class="truncate">${city}</span>
-                    </label>
+                        <span class="truncate flex-1">${escapedCity}</span>
+                    </div>
                 `;
             }).join('');
         }
 
-        function onCityCheckboxChange(checkboxEl) {
-            const city = decodeURIComponent(checkboxEl.getAttribute('data-city') || '');
+        function toggleCityByNameFromRow(rowEl, event) {
+            if (event) event.stopPropagation();
+            const city = decodeURIComponent(rowEl.getAttribute('data-city-val') || '');
+            if (!city) return;
+            const chk = rowEl.querySelector('input[type="checkbox"]');
+            if (!chk) return;
+            chk.checked = !chk.checked;
+            onCityCheckboxChange(chk, city);
+        }
+
+        function onCityCheckboxChange(checkboxEl, city) {
             if (!city) return;
             if (checkboxEl.checked) {
                 selectedCities.add(city);
