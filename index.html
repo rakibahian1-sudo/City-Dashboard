@@ -464,6 +464,17 @@
             "Mossadik", "Sujon", "Anik", "Shoaib"
         ];
 
+        const EMI_TENURE_COLUMNS = [
+            { col: 'MONTH 3', tenure: 3 },
+            { col: 'MONTH 6', tenure: 6 },
+            { col: 'MONTH 9', tenure: 9 },
+            { col: 'MONTH 12', tenure: 12 },
+            { col: 'MONTH 18', tenure: 18 },
+            { col: 'MONTH 24', tenure: 24 },
+            { col: 'MONTH 30', tenure: 30 },
+            { col: 'MONTH 36', tenure: 36 }
+        ];
+
         let activeHeaders = [...MASTER_HEADERS];
         let liveRows = [];
         let withdrawnRows = [];
@@ -557,6 +568,28 @@
                 getCell(row, 'SERIAL NUMBER') ||
                 ''
             );
+        }
+
+        // Detects EMI tenures from Month 3..Month 36 columns (ignores 0 or blank values)
+        function detectEmiSpecialFunctionalityFromRow(rr) {
+            const activeTenures = [];
+            EMI_TENURE_COLUMNS.forEach(({ col, tenure }) => {
+                const rawVal = getCell(rr, col);
+                if (!rawVal) return;
+                const cleaned = rawVal.replace(/%/g, '').trim();
+                const num = parseFloat(cleaned);
+                if (!isNaN(num) && num > 0) {
+                    activeTenures.push(tenure);
+                }
+            });
+
+            if (activeTenures.length === 0) return '';
+            const minTenure = Math.min(...activeTenures);
+            const maxTenure = Math.max(...activeTenures);
+            if (minTenure === maxTenure) {
+                return `ENABLE EMI FEATURE (TENURE ${maxTenure} MONTHS)`;
+            }
+            return `ENABLE EMI FEATURE (TENURE ${minTenure}-${maxTenure} MONTHS)`;
         }
 
         function parseTidStatusLines(rawText) {
@@ -1137,12 +1170,15 @@
                 ''
             ).trim();
 
-            const excelSpecialFunc = (
+            const directSpecialFunc = (
                 getCell(rr, 'SPECIAL FUNCTIONALITY') ||
                 getCell(rr, 'SPECIAL_FUNCTIONALITY') ||
                 getCell(rr, 'FEATURE') ||
                 ''
             ).trim();
+
+            const emiTenureSpecialFunc = detectEmiSpecialFunctionalityFromRow(rr);
+            const excelSpecialFunc = directSpecialFunc || emiTenureSpecialFunc;
 
             const excelPurpose = (
                 getCell(rr, 'PURPOSE') ||
@@ -1267,7 +1303,7 @@
                         </td>
                         <td class="py-2 px-2.5 whitespace-nowrap">
                             <input type="text" value="${item.specialFunctionality || ''}" placeholder="${liveFound ? (getCell(liveFound, 'SPECIAL FUNCTIONALITY') || 'Keep LIVE') : 'Fill...'}" onchange="updatePreviewField(${idx}, 'specialFunctionality', this.value)"
-                                class="bg-elevated border ${!item.specialFunctionality ? 'border-amber-300/60' : 'border-line'} rounded px-2 py-1 text-xs text-white w-36 outline-none">
+                                class="bg-elevated border ${!item.specialFunctionality ? 'border-amber-300/60' : 'border-line'} rounded px-2 py-1 text-xs text-white w-44 outline-none">
                         </td>
                         <td class="py-2 px-2.5 whitespace-nowrap">
                             <input type="text" value="${item.purpose || ''}" placeholder="${liveFound ? (getCell(liveFound, 'PURPOSE') || 'Keep LIVE') : 'Purpose...'}" onchange="updatePreviewField(${idx}, 'purpose', this.value)"
@@ -1808,7 +1844,6 @@
             }).join('');
         }
 
-        // Copy row as tab-separated values so pasting directly into Excel/Sheets aligns column-by-column
         function formatRowTabSeparated(row) {
             return activeHeaders.map(h => getCell(row, h)).join('\t');
         }
