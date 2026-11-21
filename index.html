@@ -387,7 +387,7 @@
 
     <!-- Top Command Header -->
     <header class="glass-card border-b border-line sticky top-0 z-40">
-        <div class="max-w-[1850px] mx-auto px-4 lg:px-6 py-3 flex flex-row items-start xl:items-center justify-between gap-2 sm:gap-3">
+        <div class="max-w-[1850px] mx-auto px-4 lg:px-6 py-3 flex flex-row items-center justify-between gap-2 sm:gap-3">
             <div class="flex items-center gap-2.5 sm:gap-3 min-w-0">
                 <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-teal-400/20 via-amber-300/10 to-purple-500/20 border border-teal-400/40 flex items-center justify-center text-teal-300" style="width:48px;height:48px;border-radius:15px;flex-shrink:0">
                     <svg viewBox="0 0 64 64" width="30" height="30" aria-label="City Dashboard logo" role="img">
@@ -898,6 +898,7 @@
         let selectedVersion = 'ALL';
         let allAvailableCities = [];
         let selectedCities = new Set();
+        let searchScopedCities = null; // null = no search; otherwise cities of the searched rows
         let activeAppVersion = localStorage.getItem('pos_active_app_version') || '43';
         let availableVersions = JSON.parse(localStorage.getItem('pos_versions_list') || '["43"]');
         let engineers = (() => {
@@ -951,6 +952,34 @@
         setInterval(updateClock, 1000);
         updateClock();
 
+        function escHtml(v) {
+            return String(v === null || v === undefined ? '' : v)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        // Clipboard copy that also works inside Android WebView / non-secure pages
+        function copyText(text, okMsg) {
+            const fallback = () => {
+                try {
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.style.position = 'fixed';
+                    ta.style.opacity = '0';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    const ok = document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    showToast(ok ? okMsg : 'Copy failed');
+                } catch (e) { showToast('Copy failed'); }
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => showToast(okMsg)).catch(fallback);
+            } else {
+                fallback();
+            }
+        }
+
         function showToast(msg) {
             const t = document.getElementById('toast');
             t.textContent = msg;
@@ -984,6 +1013,17 @@
 
         function normKey(raw) {
             return String(raw || '').trim().toUpperCase();
+        }
+
+        // Cleans TID / OLD TID / POS SERIAL values before the daily duplicate check:
+        // removes hidden spaces, leading apostrophe, ".0" and leading zeros, and
+        // ignores placeholders like "-", "NA", "N/A", "0" so they never cause false matches.
+        function normDupId(raw) {
+            let v = String(raw || '').replace(/[\s\u00A0\u200B-\u200D\uFEFF]+/g, '').replace(/^'+/, '').toUpperCase();
+            if (/^\d+\.0+$/.test(v)) v = v.replace(/\.0+$/, '');
+            if (/^\d+$/.test(v)) v = v.replace(/^0+(?=\d)/, '');
+            if (!v || /^(-+|0+|NA|N\/A|#N\/A|NULL|NONE|NIL|UNKNOWN|\.)$/.test(v)) return '';
+            return v;
         }
 
         function getTidFromRow(row) {
@@ -1308,9 +1348,16 @@
             return XLSX.read(new Uint8Array(buffer), { type: 'array', cellDates: true });
         }
 
+        let initialSyncDone = false;
+
         async function pushUpdatesToGoogleSheet(reasonLabel = 'Auto-saved') {
             const endpoint = getSyncEndpoint();
             if (!endpoint || !endpoint.includes('script.google.com')) return;
+            // Safety: never overwrite the Google Sheet with an empty page that has not loaded it yet
+            if (!initialSyncDone && liveRows.length === 0 && withdrawnRows.length === 0) {
+                showToast('Sheet not loaded yet - please Sync Live first');
+                return;
+            }
 
             const statusEl = document.getElementById('cloudSyncStatus');
             statusEl.textContent = 'SAVING TO SHEET...';
@@ -1356,6 +1403,7 @@
                         withdrawnRows = data.withdrawn;
                     }
                     mergeHeadersFromRows(liveRows.concat(withdrawnRows));
+                    initialSyncDone = true;
                     refreshAllUI();
                     statusEl.textContent = 'LIVE SYNCED';
                     if (showNotice) showToast(`Synced ${liveRows.length} live & ${withdrawnRows.length} withdrawn rows`);
@@ -1432,9 +1480,9 @@
                 const dailyPosSerials = new Set();
 
                 const preparedDaily = dailyRows.map((dRow, i) => {
-                    const tid = getTidFromRow(dRow);
-                    const oldTid = getOldTidFromRow(dRow);
-                    const posSerial = getPosSerialFromRow(dRow);
+                    const tid = normDupId(getTidFromRow(dRow));
+                    const oldTid = normDupId(getOldTidFromRow(dRow));
+                    const posSerial = normDupId(getPosSerialFromRow(dRow));
 
                     if (tid) dailyTids.add(tid);
                     if (oldTid) dailyOldTids.add(oldTid);
@@ -1444,9 +1492,6 @@
                     activeHeaders.forEach(h => {
                         normalized[h] = getCell(dRow, h);
                     });
-                    if (!getCell(normalized, 'SL.')) {
-                        setCell(normalized, 'SL.', liveRows.length + i + 1);
-                    }
                     setCell(normalized, 'APP VERSION', activeAppVersion);
                     return normalized;
                 });
@@ -1455,9 +1500,9 @@
                 let movedToWithdrawn = 0;
 
                 liveRows.forEach(lRow => {
-                    const lTid = getTidFromRow(lRow);
-                    const lOldTid = getOldTidFromRow(lRow);
-                    const lPosSerial = getPosSerialFromRow(lRow);
+                    const lTid = normDupId(getTidFromRow(lRow));
+                    const lOldTid = normDupId(getOldTidFromRow(lRow));
+                    const lPosSerial = normDupId(getPosSerialFromRow(lRow));
 
                     const matchedReasons = [];
                     if (lTid && (dailyTids.has(lTid) || dailyOldTids.has(lTid))) {
@@ -1480,6 +1525,8 @@
                 });
 
                 liveRows = remainingLive.concat(preparedDaily);
+                // Keep SL. sequential (1,2,3,4...) across the whole Live list
+                liveRows.forEach((row, idx) => setCell(row, 'SL.', idx + 1));
                 refreshAllUI();
                 pushUpdatesToGoogleSheet('Daily Excel');
                 showToast(`Duplicate check done: ${movedToWithdrawn} moved to Withdrawn, ${preparedDaily.length} added to Live & synced`);
@@ -2163,15 +2210,22 @@
             }
         }
 
+        function getDropdownCities() {
+            if (!searchScopedCities) return allAvailableCities;
+            const set = new Set(searchScopedCities);
+            selectedCities.forEach(c => set.add(c));
+            return Array.from(set).sort();
+        }
+
         function updateCitySelectionUI() {
             const btnLabel = document.getElementById('cityDropdownLabel');
             const countText = document.getElementById('citySelectedCountText');
-            const totalCitiesCount = allAvailableCities.length;
+            const totalCitiesCount = getDropdownCities().length;
 
             if (selectedCities.size === 0) {
-                btnLabel.textContent = totalCitiesCount > 0
-                    ? `CITY: ALL CITIES (${totalCitiesCount})`
-                    : 'CITY: ALL CITIES';
+                btnLabel.textContent = searchScopedCities
+                    ? `CITY: ${totalCitiesCount} FOUND IN SEARCH`
+                    : (totalCitiesCount > 0 ? `CITY: ALL CITIES (${totalCitiesCount})` : 'CITY: ALL CITIES');
                 if (countText) countText.textContent = `All cities (0 selected)`;
             } else if (selectedCities.size === 1) {
                 const onlyCity = Array.from(selectedCities)[0];
@@ -2187,7 +2241,7 @@
             const listEl = document.getElementById('cityMultiCheckboxList');
             if (!listEl) return;
             const q = (document.getElementById('citySearchInput')?.value || '').trim().toLowerCase();
-            const matches = allAvailableCities.filter(c => c.toLowerCase().includes(q));
+            const matches = getDropdownCities().filter(c => c.toLowerCase().includes(q));
 
             if (matches.length === 0) {
                 listEl.innerHTML = `<div class="text-xs text-slate-400 py-3 text-center">No matching city found.</div>`;
@@ -2237,7 +2291,7 @@
 
         function selectAllVisibleCities() {
             const q = (document.getElementById('citySearchInput')?.value || '').trim().toLowerCase();
-            allAvailableCities.filter(c => c.toLowerCase().includes(q)).forEach(c => selectedCities.add(c));
+            getDropdownCities().filter(c => c.toLowerCase().includes(q)).forEach(c => selectedCities.add(c));
             updateCitySelectionUI();
             renderCityMultiList();
             applyFilters();
@@ -2358,17 +2412,14 @@
             const typeVal = document.getElementById('typeSelect').value;
             const engVal = document.getElementById('engineerSelect').value.trim().toLowerCase();
 
+            const searchCitySet = new Set();
+
             filteredRows = source.filter(r => {
                 if (selectedVersion !== 'ALL') {
                     const rVer = getCell(r, 'APP VERSION') || 'UNASSIGNED';
                     if (rVer !== selectedVersion) return false;
                 }
                 if (typeVal !== 'ALL' && detectRowType(r) !== typeVal) return false;
-
-                if (selectedCities.size > 0) {
-                    const rCity = getCell(r, 'CITY');
-                    if (!selectedCities.has(rCity)) return false;
-                }
 
                 if (engVal && engVal !== 'all_engineer' && getCell(r, 'ROLL OUT BY').toLowerCase() !== engVal) return false;
 
@@ -2383,8 +2434,21 @@
                         if (!hit) return false;
                     }
                 }
+
+                const rowCity = getCell(r, 'CITY');
+                if (rowCity) searchCitySet.add(rowCity);
+                if (selectedCities.size > 0 && !selectedCities.has(rowCity)) return false;
                 return true;
             });
+
+            // City dropdown shows only the cities of the searched TID(s)
+            const newScoped = q ? Array.from(searchCitySet).sort() : null;
+            const changed = JSON.stringify(newScoped) !== JSON.stringify(searchScopedCities);
+            searchScopedCities = newScoped;
+            if (changed) {
+                updateCitySelectionUI();
+                renderCityMultiList();
+            }
 
             currentPage = 1;
             renderTable();
@@ -2422,7 +2486,7 @@
             tbody.innerHTML = items.map((row, idx) => {
                 const gIdx = start + idx;
                 const cells = activeHeaders.map(h => {
-                    const val = getCell(row, h) || '-';
+                    const val = escHtml(getCell(row, h) || '-');
                     return `<td class="py-2.5 px-3 text-slate-100 whitespace-nowrap max-w-xs truncate" title="${val}">${val}</td>`;
                 }).join('');
 
@@ -2453,7 +2517,7 @@
         function copyRow(idx) {
             const row = filteredRows[idx];
             if (!row) return;
-            navigator.clipboard.writeText(formatRowTabSeparated(row)).then(() => showToast('Row copied for sheet paste'));
+            copyText(formatRowTabSeparated(row), 'Row copied for sheet paste');
         }
 
         function openDetailModal(idx) {
@@ -2461,12 +2525,12 @@
             if (!row) return;
             document.getElementById('modalBody').innerHTML = activeHeaders.map(h => `
                 <div class="bg-elevated border border-line rounded-lg p-2.5">
-                    <div class="text-[10px] font-bold uppercase tracking-wider text-teal-300">${h.trim()}</div>
-                    <div class="text-slate-100 mt-0.5 break-words">${getCell(row, h) || '-'}</div>
+                    <div class="text-[10px] font-bold uppercase tracking-wider text-teal-300">${escHtml(h.trim())}</div>
+                    <div class="text-slate-100 mt-0.5 break-words">${escHtml(getCell(row, h) || '-')}</div>
                 </div>
             `).join('');
             document.getElementById('modalCopyBtn').onclick = () => {
-                navigator.clipboard.writeText(formatRowTabSeparated(row)).then(() => showToast('Row copied for sheet paste'));
+                copyText(formatRowTabSeparated(row), 'Row copied for sheet paste');
             };
             const m = document.getElementById('detailModal');
             m.classList.remove('hidden');
