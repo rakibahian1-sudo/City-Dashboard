@@ -2139,6 +2139,11 @@
                     if (sDet.status) {
                         addRemarkStatus(row, normalizeCaseText(sDet.status));
                     }
+                    // REMARKS is Done -> NEW/OS PROFILE Done. Any other remark -> NEW/OS PROFILE stays as it is in Live
+                    if (String(sDet.status || '').trim().toLowerCase() === 'done' ||
+                        getCell(row, 'REMARKS (IF ANY)').trim().toLowerCase() === 'done') {
+                        setCell(row, PROFILE_HEADER, 'Done');
+                    }
                 } else {
                     const statusText = normalizeCaseText(sDet.status || 'Done');
                     const rowEng = sDet.rollOutBy || defaultEng;
@@ -2166,7 +2171,8 @@
                     }
 
                     addRemarkStatus(row, statusText);
-                    if (statusText.trim().toLowerCase() === 'done') {
+                    if (statusText.trim().toLowerCase() === 'done' ||
+                        getCell(row, 'REMARKS (IF ANY)').trim().toLowerCase() === 'done') {
                         setCell(row, PROFILE_HEADER, 'Done');
                     }
                 }
