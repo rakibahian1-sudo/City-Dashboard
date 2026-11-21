@@ -2123,6 +2123,9 @@
                     }
 
                     addRemarkStatus(row, statusText);
+                    if (statusText.trim().toLowerCase() === 'done') {
+                        setCell(row, PROFILE_HEADER, 'Done');
+                    }
                 }
 
                 updatedCount++;
