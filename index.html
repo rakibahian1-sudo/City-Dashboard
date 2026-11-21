@@ -859,7 +859,7 @@
             "POS TYPE", "POS MODEL", "POS SERIAL", "OLD POS SERIAL",
             "SIM SERIAL NUMBER", "SIM NUMBER", "SIM CARRIER ", "IP ADDRESS ",
             "PORT NUMBER", "REASON", "SPECIAL FUNCTIONALITY", "INSTALLATION DATE",
-            "APP VERSION", "ROLL OUT DATE", "ROLL OUT BY", "NW OS/ PROFILE DATE",
+            "APP VERSION", "ROLL OUT DATE", "ROLL OUT BY", "NEW/OS PROFILE",
             "QR", "LIMIT", "MERCHANT CONTACT PERSON (S)",
             "MERCHANT CONTACT NUMBER (S) ", "HANDED OVER TO", "HANDOVER DATE",
             "REMARKS (IF ANY)", "Updated By", "WITHDRAWN REPORT"
@@ -884,6 +884,7 @@
             { col: 'MONTH 36', tenure: 36 }
         ];
 
+        const PROFILE_HEADER = 'NEW/OS PROFILE';
         let activeHeaders = [...MASTER_HEADERS];
         let liveRows = [];
         let withdrawnRows = [];
@@ -1361,7 +1362,8 @@
             SIMSERIALNUMBER: ['SIMSERIAL', 'SIMSERIALNO', 'SIMSRNO', 'SIMSERIALNUM', 'SIMSN', 'ICCID'],
             OLDPOSSERIAL: ['OLDPOSSERIALNO', 'OLDPOSSERIALNUMBER', 'OLDPOSSN', 'OLDSERIAL', 'OLDSERIALNO'],
             POSSERIAL: ['POSSERIALNO', 'POSSERIALNUMBER', 'POSSN', 'POSSRNO'],
-            CONFIGDATE: ['CONFIGURATIONDATE', 'CONFIGDT']
+            CONFIGDATE: ['CONFIGURATIONDATE', 'CONFIGDT'],
+            NEWOSPROFILE: ['NWOSPROFILEDATE', 'NWOSPROFILE', 'NEWOSPROFILEDATE']
         };
         function sameHeader(a, b) {
             const ka = hdrKey(a), kb = hdrKey(b);
@@ -1765,9 +1767,11 @@
                 getCell(rr, 'STATUS') ||
                 getCell(rr, 'REMARKS (IF ANY)') ||
                 getCell(rr, 'REMARKS') ||
-                getCell(rr, 'NW OS/ PROFILE DATE') ||
                 ''
             ).trim();
+            // Update sheet: status Done (or NEW/OS PROFILE Done) -> Live gets Done in REMARKS and NEW/OS PROFILE
+            const profileDone = statusRaw.trim().toLowerCase() === 'done' ||
+                getCell(rr, PROFILE_HEADER).trim().toLowerCase() === 'done';
 
             const merchantLabel = liveMatch
                 ? (getCell(liveMatch, 'MERCHANT NAME') || getCell(liveMatch, 'DBA NAME') || 'Live Terminal')
@@ -1779,6 +1783,7 @@
                 matched: Boolean(liveMatch),
                 merchantLabel,
                 status: statusRaw ? normalizeCaseText(statusRaw) : '',
+                profileDone: profileDone,
                 appVersion: excelAppVer,
                 specialFunctionality: excelSpecialFunc,
                 purpose: computedPurpose,
@@ -2085,6 +2090,9 @@
                     if (sDet.limit) {
                         setCell(row, 'LIMIT', sDet.limit);
                     }
+                    if (sDet.profileDone) {
+                        setCell(row, PROFILE_HEADER, 'Done');
+                    }
                     if (sDet.status) {
                         addRemarkStatus(row, normalizeCaseText(sDet.status));
                     }
@@ -2219,6 +2227,12 @@
         function mergeHeadersFromRows(rows) {
             if (!rows || rows.length === 0) return;
             rows.forEach(r => {
+                Object.keys(r).forEach(k => {
+                    if (k !== PROFILE_HEADER && sameHeader(k, PROFILE_HEADER)) {
+                        if (!String(r[PROFILE_HEADER] || '').trim()) r[PROFILE_HEADER] = r[k];
+                        delete r[k];
+                    }
+                });
                 Object.keys(r).forEach(k => {
                     const clean = k.trim();
                     if (clean && !activeHeaders.some(h => sameHeader(h, clean))) {
