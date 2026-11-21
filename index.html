@@ -1598,6 +1598,27 @@
                 const remainingLive = [];
                 let movedToWithdrawn = 0;
 
+                // Same record = same TID + same POS SERIAL. If the Daily file contains a terminal that is already
+                // in Live (re-uploading the same file), it is refreshed in Live - it is NOT sent to Withdrawn.
+                const sameKeyOf = (r) => {
+                    const t = normDupId(getTidFromRow(r));
+                    const sv = normDupId(getPosSerialFromRow(r));
+                    return t ? t + '|' + sv : '';
+                };
+                const dailySameKeys = new Set();
+                preparedDaily.forEach(r => {
+                    const k = sameKeyOf(r);
+                    if (k) dailySameKeys.add(k);
+                });
+                let refreshedSame = 0;
+
+                // Clean up: rows that an earlier upload wrongly sent to Withdrawn (same TID + POS SERIAL as a Daily row)
+                withdrawnRows = withdrawnRows.filter(r => {
+                    const k = sameKeyOf(r);
+                    if (!k || !dailySameKeys.has(k)) return true;
+                    return !/Replaced by Daily Excel/i.test(getCell(r, 'WITHDRAWN REPORT'));
+                });
+
                 // Same terminal already in WITHDRAWN (same TID/OLD TID + POS SERIAL) is not added there again
                 const withdrawnKeyOf = (r) => {
                     const ids = collectDupIds(r);
@@ -1611,6 +1632,11 @@
                 });
 
                 liveRows.forEach(lRow => {
+                    const sk = sameKeyOf(lRow);
+                    if (sk && dailySameKeys.has(sk)) {
+                        refreshedSame++;   // same terminal re-uploaded: Daily row replaces it, nothing goes to Withdrawn
+                        return;
+                    }
                     const lIds = collectDupIds(lRow);
                     const matchedReasons = [];
                     lIds.tids.forEach(v => {
@@ -1649,7 +1675,7 @@
                 liveRows.forEach((row, idx) => setCell(row, 'SL.', idx + 1));
                 refreshAllUI();
                 pushUpdatesToGoogleSheet('Daily Excel');
-                showToast(`Duplicate check done: ${movedToWithdrawn} moved to Withdrawn, ${preparedDaily.length} added to Live & synced`);
+                showToast(`Duplicate check done: ${movedToWithdrawn} moved to Withdrawn, ${refreshedSame} already in Live (refreshed), ${preparedDaily.length} in Live & synced`);
             };
             reader.readAsArrayBuffer(file);
         }
