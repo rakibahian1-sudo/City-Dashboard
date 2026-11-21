@@ -543,7 +543,7 @@
                     <span>TID + STATUS ROLLOUT UPDATE</span>
                 </div>
                 <span class="text-[11px] text-slate-400">
-                    TID only (e.g. <code class="text-teal-300">18004252</code>) → <strong class="text-teal-300">Done</strong> • <code class="text-teal-300">Done</code> → <strong class="text-teal-300">NW OS/ PROFILE DATE</strong> • Non-Done → <strong class="text-amber-300">REMARKS (IF ANY)</strong> • Search App Version: <strong class="text-purple-300" id="panelVerBadge">43</strong>
+                    TID only (e.g. <code class="text-teal-300">18004252</code>) → <strong class="text-teal-300">Done</strong> • <code class="text-teal-300">Done</code> / any other status → <strong class="text-amber-300">REMARKS (IF ANY)</strong> • Search App Version: <strong class="text-purple-300" id="panelVerBadge">43</strong>
                 </span>
             </div>
 
@@ -1079,6 +1079,17 @@
                 });
             }
             return { tids, serials };
+        }
+
+        // Writes a rollout status (Done or any remark) into REMARKS (IF ANY); keeps older remarks, no duplicate text
+        function addRemarkStatus(row, text) {
+            const prev = getCell(row, 'REMARKS (IF ANY)');
+            if (!prev) {
+                setCell(row, 'REMARKS (IF ANY)', text);
+                return;
+            }
+            const already = prev.split('|').map(t => t.trim().toLowerCase()).includes(String(text).trim().toLowerCase());
+            if (!already) setCell(row, 'REMARKS (IF ANY)', `${prev} | ${text}`);
         }
 
         function getTidFromRow(row) {
@@ -2075,18 +2086,10 @@
                         setCell(row, 'LIMIT', sDet.limit);
                     }
                     if (sDet.status) {
-                        const statusText = normalizeCaseText(sDet.status);
-                        if (statusText.toLowerCase() === 'done') {
-                            setCell(row, 'NW OS/ PROFILE DATE', 'Done');
-                        } else {
-                            const prevRemarks = getCell(row, 'REMARKS (IF ANY)');
-                            const merged = prevRemarks ? `${prevRemarks} | ${statusText}` : statusText;
-                            setCell(row, 'REMARKS (IF ANY)', merged);
-                        }
+                        addRemarkStatus(row, normalizeCaseText(sDet.status));
                     }
                 } else {
                     const statusText = normalizeCaseText(sDet.status || 'Done');
-                    const isDoneStatus = statusText.toLowerCase() === 'done';
                     const rowEng = sDet.rollOutBy || defaultEng;
                     const rowAppVer = sDet.appVersion || activeAppVersion;
                     const cfgDate = getCell(row, 'CONFIG DATE');
@@ -2111,13 +2114,7 @@
                         setCell(row, 'LIMIT', sDet.limit);
                     }
 
-                    if (isDoneStatus) {
-                        setCell(row, 'NW OS/ PROFILE DATE', 'Done');
-                    } else {
-                        const prevRemarks = getCell(row, 'REMARKS (IF ANY)');
-                        const merged = prevRemarks ? `${prevRemarks} | ${statusText}` : statusText;
-                        setCell(row, 'REMARKS (IF ANY)', merged);
-                    }
+                    addRemarkStatus(row, statusText);
                 }
 
                 updatedCount++;
