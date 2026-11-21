@@ -1075,7 +1075,7 @@
                     if (!v) return;
                     if (tids.size === 0 && /^180\d{5}$/.test(v)) tids.add(v);
                     if (serials.size === 0 && /^(800|8015)\d{5,}$/.test(v) &&
-                        !/SIM|MID|PHONE|CONTACT|NUMBER|NUM$/.test(hk)) serials.add(v);
+                        !/SIM|OLD|MID|PHONE|CONTACT|NUMBER|NUM$/.test(hk)) serials.add(v);
                 });
             }
             return { tids, serials };
@@ -1385,9 +1385,22 @@
             row[headerName] = value;
         }
 
+        // If Excel shows a long number as 8.98801E+12, bring back the full digits (serials, SIM numbers etc.).
+        // Text cells (for example ",8988...") are never touched and stay exactly as written in Excel.
+        function restoreLongNumber(ws, start, r, c, val) {
+            const txt = String(val).trim();
+            if (!/^-?\d+(\.\d+)?E\+\d+$/i.test(txt)) return val;
+            const cell = ws[XLSX.utils.encode_cell({ r: start.r + r, c: start.c + c })];
+            if (cell && cell.t === 'n' && Number.isSafeInteger(cell.v) && String(Math.abs(cell.v)).length <= 15) {
+                return Number(cell.v).toLocaleString('fullwide', { useGrouping: false });
+            }
+            return val;
+        }
+
         function parseSheetRows(workbook) {
             const sheetName = workbook.SheetNames[0];
             const ws = workbook.Sheets[sheetName];
+            const rangeStart = ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']).s : { r: 0, c: 0 };
             const matrix = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
             if (!matrix || matrix.length === 0) return [];
 
@@ -1414,7 +1427,7 @@
                 if (!hasAnyValue) continue;
                 const obj = {};
                 headers.forEach((h, cIdx) => {
-                    if (h) obj[h] = formatExcelCellValue(arr[cIdx]);
+                    if (h) obj[h] = restoreLongNumber(ws, rangeStart, r, cIdx, formatExcelCellValue(arr[cIdx]));
                 });
                 dataRows.push(obj);
             }
