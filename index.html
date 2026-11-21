@@ -339,6 +339,48 @@
         ::-webkit-scrollbar-thumb { background: linear-gradient(#2dd4bf, #6d5bd0); border-radius: 999px; }
         ::-webkit-scrollbar-thumb:hover { background: linear-gradient(#5eead4, #a855f7); }
         html body ::selection { background: #2dd4bf; color: #04201c; }
+
+        /* keep header sticky (glass-card theme sets position:relative) */
+        html body header.glass-card { position: sticky; top: 0; }
+
+        /* ===== 3-dot tools menu ===== */
+        .tools-dots-btn {
+            width: 40px; height: 40px; border-radius: 13px; font-size: 16px; color: #99f6e4;
+            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(145deg, rgba(45,212,191,.14), rgba(168,85,247,.12));
+            border: 1px solid rgba(45,212,191,.4);
+        }
+        .tools-dots-btn[aria-expanded="true"] { box-shadow: 0 0 0 3px rgba(45,212,191,.2), 0 0 22px -4px rgba(45,212,191,.6); color: #fff; }
+        .tools-panel {
+            position: absolute; right: 0; top: calc(100% + 12px); width: 330px; max-width: calc(100vw - 24px);
+            padding: 14px; border-radius: 18px; z-index: 60;
+            background:
+                radial-gradient(120% 70% at 0% 0%, rgba(45,212,191,.14), transparent 55%),
+                radial-gradient(110% 70% at 100% 100%, rgba(168,85,247,.14), transparent 55%),
+                linear-gradient(165deg, rgba(15,24,44,.98), rgba(7,11,22,.99));
+            border: 1px solid rgba(148,163,184,.18);
+            box-shadow: 0 30px 70px -14px rgba(0,0,0,.9), 0 0 0 1px rgba(45,212,191,.16), 0 0 40px -12px rgba(45,212,191,.35);
+            animation: modalPop .2s cubic-bezier(.2,.9,.3,1.15); overflow: hidden;
+        }
+        .tools-panel.hidden { display: none; }
+        .tools-panel::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+            background: linear-gradient(90deg, #2dd4bf, #fbbf24, #a855f7); }
+        .tools-title { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #fcd34d; margin: 4px 2px 12px; display: flex; gap: 8px; align-items: center; }
+        .tools-field { margin-bottom: 10px; }
+        .tools-label { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #7f92b5; margin: 0 2px 5px; }
+        .tools-field input { width: 100%; border-radius: 11px; padding: 9px 12px; font-size: 12px; color: #e2e8f0; outline: none; border: 1px solid rgba(148,163,184,.2); background: rgba(8,14,28,.75); }
+        .tools-item {
+            --c: #2dd4bf; display: flex; align-items: center; gap: 12px; cursor: pointer;
+            padding: 10px 12px; margin-top: 8px; border-radius: 14px;
+            background: rgba(255,255,255,.03); border: 1px solid rgba(148,163,184,.12);
+        }
+        .tools-teal { --c: #2dd4bf; } .tools-purple { --c: #a855f7; } .tools-rose { --c: #fb7185; }
+        html body .tools-item:hover { background: color-mix(in srgb, var(--c) 12%, transparent); border-color: color-mix(in srgb, var(--c) 55%, transparent); transform: translateX(3px); box-shadow: none; }
+        .tools-ico { width: 36px; height: 36px; border-radius: 11px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 15px;
+            color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent); border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); }
+        .tools-txt { display: flex; flex-direction: column; line-height: 1.25; }
+        .tools-txt b { font-size: 12.5px; color: #f1f5f9; font-weight: 700; }
+        .tools-txt small { font-size: 10.5px; color: #8a9bbb; margin-top: 1px; }
     </style>
 </head>
 <body class="min-h-screen font-sans antialiased selection:bg-teal-300 selection:text-slate-950">
@@ -378,32 +420,45 @@
                 </button>
             </div>
 
-            <!-- Upload Controls & Live Clock -->
-            <div class="flex flex-wrap items-center gap-2">
-                <input id="sheetUrlInput" type="text" placeholder="Google Sheet / Apps Script URL..."
-                    class="bg-elevated border border-line focus:border-teal-300 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-400 w-48 sm:w-60 outline-none">
-
-                <label class="bg-teal-400/15 hover:bg-teal-400/25 text-teal-200 border border-teal-300/40 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1.5 transition">
-                    <i class="fa-solid fa-file-excel"></i>
-                    <span>Master/Live Sheet</span>
-                    <input type="file" id="liveFileInput" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleLiveUpload(event)">
-                </label>
-
-                <label class="bg-purple-500/15 hover:bg-purple-500/25 text-purple-200 border border-purple-400/40 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1.5 transition">
-                    <i class="fa-solid fa-calendar-plus"></i>
-                    <span>Daily Excel</span>
-                    <input type="file" id="dailyFileInput" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleDailyUpload(event)">
-                </label>
-
-                <label class="bg-rose-500/15 hover:bg-rose-500/25 text-rose-200 border border-rose-400/40 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1.5 transition">
-                    <i class="fa-solid fa-file-export"></i>
-                    <span>Upload Withdrawn</span>
-                    <input type="file" id="withdrawnFileInput" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleWithdrawnUpload(event)">
-                </label>
-
-                <div class="text-right pl-2.5 border-l border-line">
+            <!-- Live Clock + 3-dot tools menu -->
+            <div class="flex items-center gap-3">
+                <div class="text-right pr-3 border-r border-line">
                     <div id="liveClock" class="text-base sm:text-lg font-bold text-amber-300 leading-none font-mono">12:35:00 AM</div>
                     <div id="liveDate" class="text-[10px] font-semibold tracking-wider text-slate-400 uppercase mt-1">FRI, NOV 20, 2026</div>
+                </div>
+
+                <div id="toolsMenuWrap" class="relative">
+                    <button type="button" id="toolsMenuBtn" onclick="toggleToolsMenu(event)" title="Data & upload tools"
+                        class="tools-dots-btn" aria-haspopup="true" aria-expanded="false">
+                        <i class="fa-solid fa-ellipsis-vertical"></i>
+                    </button>
+
+                    <div id="toolsMenuPanel" class="tools-panel hidden">
+                        <div class="tools-title"><i class="fa-solid fa-sliders"></i> Data &amp; Upload Tools</div>
+
+                        <div class="tools-field">
+                            <div class="tools-label">Google Sheet / Apps Script URL</div>
+                            <input id="sheetUrlInput" type="text" placeholder="Paste Google Sheet / Apps Script URL...">
+                        </div>
+
+                        <label class="tools-item tools-teal">
+                            <span class="tools-ico"><i class="fa-solid fa-file-excel"></i></span>
+                            <span class="tools-txt"><b>Master/Live Sheet</b><small>Upload the full live terminal list</small></span>
+                            <input type="file" id="liveFileInput" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleLiveUpload(event)">
+                        </label>
+
+                        <label class="tools-item tools-purple">
+                            <span class="tools-ico"><i class="fa-solid fa-calendar-plus"></i></span>
+                            <span class="tools-txt"><b>Daily Excel</b><small>Add today's new / updated rows</small></span>
+                            <input type="file" id="dailyFileInput" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleDailyUpload(event)">
+                        </label>
+
+                        <label class="tools-item tools-rose">
+                            <span class="tools-ico"><i class="fa-solid fa-file-export"></i></span>
+                            <span class="tools-txt"><b>Upload Withdrawn</b><small>Mark terminals as withdrawn</small></span>
+                            <input type="file" id="withdrawnFileInput" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleWithdrawnUpload(event)">
+                        </label>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2470,6 +2525,29 @@
         setDefaultDatePicker();
         renderHeader();
         syncGoogleSheet(false);
+    
+        function toggleToolsMenu(e) {
+            if (e) e.stopPropagation();
+            const p = document.getElementById('toolsMenuPanel');
+            const b = document.getElementById('toolsMenuBtn');
+            const open = p.classList.contains('hidden');
+            p.classList.toggle('hidden', !open);
+            b.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+        function closeToolsMenu() {
+            const p = document.getElementById('toolsMenuPanel');
+            const b = document.getElementById('toolsMenuBtn');
+            if (p) p.classList.add('hidden');
+            if (b) b.setAttribute('aria-expanded', 'false');
+        }
+        document.addEventListener('click', (e) => {
+            const wrap = document.getElementById('toolsMenuWrap');
+            if (wrap && !wrap.contains(e.target)) closeToolsMenu();
+        });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeToolsMenu(); });
+        document.addEventListener('change', (e) => {
+            if (e.target && e.target.type === 'file' && e.target.closest('#toolsMenuPanel')) setTimeout(closeToolsMenu, 150);
+        });
     </script>
 </body>
 </html>
