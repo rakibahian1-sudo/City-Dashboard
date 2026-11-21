@@ -1591,11 +1591,24 @@
                         normalized[h] = getCell(dRow, h);
                     });
                     setCell(normalized, 'APP VERSION', activeAppVersion);
+                    setCell(normalized, PROFILE_HEADER, 'Done');   // Daily sheet terminals: NEW/OS PROFILE = Done
                     return normalized;
                 });
 
                 const remainingLive = [];
                 let movedToWithdrawn = 0;
+
+                // Same terminal already in WITHDRAWN (same TID/OLD TID + POS SERIAL) is not added there again
+                const withdrawnKeyOf = (r) => {
+                    const ids = collectDupIds(r);
+                    const k = Array.from(ids.tids).sort().join('+') + '|' + Array.from(ids.serials).sort().join('+');
+                    return k === '|' ? '' : k;
+                };
+                const withdrawnKeys = new Set();
+                withdrawnRows.forEach(r => {
+                    const k = withdrawnKeyOf(r);
+                    if (k) withdrawnKeys.add(k);
+                });
 
                 liveRows.forEach(lRow => {
                     const lIds = collectDupIds(lRow);
@@ -1608,9 +1621,13 @@
                     });
 
                     if (matchedReasons.length > 0) {
-                        setCell(lRow, 'WITHDRAWN REPORT', `Duplicate ${matchedReasons.join(', ')} - Replaced by Daily Excel`);
-                        withdrawnRows.push(lRow);
-                        movedToWithdrawn++;
+                        const wKey = withdrawnKeyOf(lRow);
+                        if (!wKey || !withdrawnKeys.has(wKey)) {
+                            setCell(lRow, 'WITHDRAWN REPORT', `Duplicate ${matchedReasons.join(', ')} - Replaced by Daily Excel`);
+                            withdrawnRows.push(lRow);
+                            if (wKey) withdrawnKeys.add(wKey);
+                            movedToWithdrawn++;
+                        }
                     } else {
                         remainingLive.push(lRow);
                     }
