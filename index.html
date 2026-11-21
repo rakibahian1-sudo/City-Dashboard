@@ -1026,6 +1026,30 @@
             return v;
         }
 
+        // Reads CONFIG DATE in the formats used by the sheet; returns a number (ms) or NaN
+        function parseConfigDate(raw) {
+            const t = String(raw || '').trim();
+            if (!t) return NaN;
+            const mon = { jan:0, feb:1, mar:2, apr:3, may:4, jun:5, jul:6, aug:7, sep:8, oct:9, nov:10, dec:11 };
+            let m;
+            if ((m = t.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/))) {
+                return new Date(+m[1], +m[2] - 1, +m[3]).getTime();
+            }
+            if ((m = t.match(/^(\d{1,2})[-\s\/]([A-Za-z]{3})[A-Za-z]*[-\s\/,]*(\d{2,4})/))) {
+                const y = m[3].length === 2 ? 2000 + +m[3] : +m[3];
+                const mi = mon[m[2].toLowerCase()];
+                if (mi !== undefined) return new Date(y, mi, +m[1]).getTime();
+            }
+            if ((m = t.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})/))) {
+                let a = +m[1], b = +m[2];
+                const y = m[3].length === 2 ? 2000 + +m[3] : +m[3];
+                if (a > 12) return new Date(y, b - 1, a).getTime();   // dd/mm/yyyy
+                return new Date(y, a - 1, b).getTime();               // mm/dd/yyyy (app default)
+            }
+            const f = Date.parse(t);
+            return isNaN(f) ? NaN : f;
+        }
+
         function getTidFromRow(row) {
             return normKey(getCell(row, 'TID') || getCell(row, 'TERMINAL ID') || getCell(row, 'TID NO') || '');
         }
@@ -1280,13 +1304,36 @@
             showToast(`Active App Version switched to ${activeAppVersion}`);
         }
 
+        // Header names are compared ignoring case, spaces, new-lines, dots and underscores,
+        // so "SIM  SERIAL\nNUMBER" and "Sim Serial Number" are the same column.
+        const _hdrKeyCache = new Map();
+        function hdrKey(h) {
+            let v = _hdrKeyCache.get(h);
+            if (v === undefined) {
+                v = String(h).toUpperCase().replace(/[^A-Z0-9]/g, '');
+                _hdrKeyCache.set(h, v);
+            }
+            return v;
+        }
+        const HEADER_ALIASES = {
+            SIMSERIALNUMBER: ['SIMSERIAL', 'SIMSERIALNO', 'SIMSRNO', 'SIMSERIALNUM', 'SIMSN', 'ICCID'],
+            OLDPOSSERIAL: ['OLDPOSSERIALNO', 'OLDPOSSERIALNUMBER', 'OLDPOSSN', 'OLDSERIAL', 'OLDSERIALNO'],
+            POSSERIAL: ['POSSERIALNO', 'POSSERIALNUMBER', 'POSSN', 'POSSRNO'],
+            CONFIGDATE: ['CONFIGURATIONDATE', 'CONFIGDT']
+        };
+        function sameHeader(a, b) {
+            const ka = hdrKey(a), kb = hdrKey(b);
+            if (ka === kb) return true;
+            return (HEADER_ALIASES[ka] && HEADER_ALIASES[ka].includes(kb)) ||
+                   (HEADER_ALIASES[kb] && HEADER_ALIASES[kb].includes(ka));
+        }
+
         function getCell(row, headerName) {
             if (row[headerName] !== undefined && row[headerName] !== null) {
                 return String(row[headerName]).trim();
             }
-            const target = headerName.trim().toUpperCase();
             for (const k of Object.keys(row)) {
-                if (k.trim().toUpperCase() === target && row[k] !== undefined && row[k] !== null) {
+                if (row[k] !== undefined && row[k] !== null && sameHeader(k, headerName)) {
                     return String(row[k]).trim();
                 }
             }
@@ -1298,9 +1345,8 @@
                 row[headerName] = value;
                 return;
             }
-            const target = headerName.trim().toUpperCase();
             for (const k of Object.keys(row)) {
-                if (k.trim().toUpperCase() === target) {
+                if (sameHeader(k, headerName)) {
                     row[k] = value;
                     return;
                 }
@@ -1524,7 +1570,18 @@
                     }
                 });
 
-                liveRows = remainingLive.concat(preparedDaily);
+                const combinedLive = remainingLive.concat(preparedDaily);
+                // CONFIG DATE in sequence (oldest -> newest); rows without a readable date stay at the end in their old order
+                liveRows = combinedLive
+                    .map((row, idx) => ({ row, idx, ts: parseConfigDate(getCell(row, 'CONFIG DATE')) }))
+                    .sort((a, b) => {
+                        const an = isNaN(a.ts), bn = isNaN(b.ts);
+                        if (an && bn) return a.idx - b.idx;
+                        if (an) return 1;
+                        if (bn) return -1;
+                        return a.ts - b.ts || a.idx - b.idx;
+                    })
+                    .map(o => o.row);
                 // Keep SL. sequential (1,2,3,4...) across the whole Live list
                 liveRows.forEach((row, idx) => setCell(row, 'SL.', idx + 1));
                 refreshAllUI();
@@ -2134,7 +2191,7 @@
             rows.forEach(r => {
                 Object.keys(r).forEach(k => {
                     const clean = k.trim();
-                    if (clean && !activeHeaders.some(h => h.trim().toUpperCase() === clean.toUpperCase())) {
+                    if (clean && !activeHeaders.some(h => sameHeader(h, clean))) {
                         activeHeaders.push(k);
                     }
                 });
