@@ -387,8 +387,8 @@
 
     <!-- Top Command Header -->
     <header class="glass-card border-b border-line sticky top-0 z-40">
-        <div class="max-w-[1850px] mx-auto px-4 lg:px-6 py-3 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
-            <div class="flex flex-wrap items-center gap-3">
+        <div class="max-w-[1850px] mx-auto px-4 lg:px-6 py-3 flex flex-row items-start xl:items-center justify-between gap-2 sm:gap-3">
+            <div class="flex items-center gap-2.5 sm:gap-3 min-w-0">
                 <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-teal-400/20 via-amber-300/10 to-purple-500/20 border border-teal-400/40 flex items-center justify-center text-teal-300" style="width:48px;height:48px;border-radius:15px;flex-shrink:0">
                     <svg viewBox="0 0 64 64" width="30" height="30" aria-label="City Dashboard logo" role="img">
                         <defs>
@@ -404,8 +404,9 @@
                         <circle cx="32.7" cy="15.5" r="2.6" fill="#fbbf24"/>
                     </svg>
                 </div>
+                <div class="flex flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:gap-3">
                 <div>
-                    <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-teal-300 via-amber-200 to-purple-300 bg-clip-text text-transparent">
+                    <h1 class="text-lg sm:text-xl font-bold tracking-tight bg-gradient-to-r from-teal-300 via-amber-200 to-purple-300 bg-clip-text text-transparent">
                         City Dashboard
                     </h1>
                     <div class="flex items-center gap-2 text-[11px] font-semibold tracking-wider text-teal-300 uppercase">
@@ -418,13 +419,14 @@
                     <i class="fa-solid fa-rotate" id="syncIcon"></i>
                     <span>Sync Live</span>
                 </button>
+                </div>
             </div>
 
             <!-- Live Clock + 3-dot tools menu -->
-            <div class="flex items-center gap-3 justify-end w-full xl:w-auto">
-                <div class="text-right pr-3 border-r border-line">
-                    <div id="liveClock" class="text-base sm:text-lg font-bold text-amber-300 leading-none font-mono">12:35:00 AM</div>
-                    <div id="liveDate" class="text-[10px] font-semibold tracking-wider text-slate-400 uppercase mt-1">FRI, NOV 20, 2026</div>
+            <div class="flex items-center gap-2 sm:gap-3 justify-end shrink-0">
+                <div class="text-right pr-2 sm:pr-3 border-r border-line">
+                    <div id="liveClock" class="text-sm sm:text-lg font-bold text-amber-300 leading-none font-mono whitespace-nowrap">12:35:00 AM</div>
+                    <div id="liveDate" class="text-[9px] sm:text-[10px] font-semibold tracking-normal sm:tracking-wider text-slate-400 uppercase mt-1 whitespace-nowrap">FRI, NOV 20, 2026</div>
                 </div>
 
                 <div id="toolsMenuWrap" class="relative">
