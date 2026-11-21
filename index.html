@@ -1194,10 +1194,31 @@
             document.getElementById('rolloutPanelDatePicker').value = `${y}-${m}-${d}`;
         }
 
+        // Engineer list + App Version settings are kept in the Google Sheet (SETTINGS tab) so phone and laptop show the same
+        async function pushSettingsToGoogleSheet() {
+            const endpoint = getSyncEndpoint();
+            if (!endpoint || !endpoint.includes('script.google.com')) return;
+            if (!initialSyncDone) {
+                showToast('Saved on this device only - press Sync Live first to share settings');
+                return;
+            }
+            try {
+                await fetch(endpoint, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ settings: { engineers: engineers, activeAppVersion: activeAppVersion, availableVersions: availableVersions } })
+                });
+            } catch (err) {
+                showToast('Settings could not be saved to the sheet');
+            }
+        }
+
         function saveEngineers() {
             localStorage.setItem('pos_engineers_list', JSON.stringify(engineers));
             renderEngineerDropdowns();
             renderEngineerModalList();
+            pushSettingsToGoogleSheet();
             if (rolloutPreviewRows && rolloutPreviewRows.length > 0) {
                 renderRolloutPreviewTable();
             }
@@ -1331,6 +1352,7 @@
             if (!val) return;
             activeAppVersion = val.trim();
             syncVersionSelectUI();
+            pushSettingsToGoogleSheet();
             showToast(`Active App Version set to ${activeAppVersion}`);
         }
 
@@ -1344,6 +1366,7 @@
             activeAppVersion = val;
             inp.value = '';
             syncVersionSelectUI();
+            pushSettingsToGoogleSheet();
             showToast(`Active App Version switched to ${activeAppVersion}`);
         }
 
@@ -1507,6 +1530,24 @@
                     }
                     mergeHeadersFromRows(liveRows.concat(withdrawnRows));
                     initialSyncDone = true;
+                    const st = data.settings;
+                    if (st && Object.keys(st).length > 0) {
+                        if (Array.isArray(st.engineers) && st.engineers.length > 0) {
+                            engineers = st.engineers.map(n => String(n));
+                            localStorage.setItem('pos_engineers_list', JSON.stringify(engineers));
+                            renderEngineerDropdowns();
+                            renderEngineerModalList();
+                        }
+                        if (Array.isArray(st.availableVersions) && st.availableVersions.length > 0) {
+                            availableVersions = st.availableVersions.map(v => String(v));
+                        }
+                        if (st.activeAppVersion) {
+                            activeAppVersion = String(st.activeAppVersion);
+                        }
+                        syncVersionSelectUI();
+                    } else if (st !== undefined) {
+                        pushSettingsToGoogleSheet();   // sheet has no settings yet: this device's settings become the shared ones
+                    }
                     refreshAllUI();
                     statusEl.textContent = 'LIVE SYNCED';
                     if (showNotice) showToast(`Synced ${liveRows.length} live & ${withdrawnRows.length} withdrawn rows`);
