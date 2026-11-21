@@ -1050,6 +1050,37 @@
             return isNaN(f) ? NaN : f;
         }
 
+        // Collects every TID / OLD TID and POS SERIAL of a row for the duplicate check.
+        // 1) by header name (any column with TID in its name, any POS/other SERIAL column except SIM and OLD ones)
+        // 2) fallback by known number pattern when a header is not recognised:
+        //    TID / OLD TID = 8 digits starting with 180, POS SERIAL = digits starting with 800 or 8015
+        function collectDupIds(row) {
+            const tids = new Set();
+            const serials = new Set();
+            const keys = Object.keys(row);
+            keys.forEach(k => {
+                const hk = hdrKey(k);
+                const v = normDupId(row[k]);
+                if (!v) return;
+                if (hk.includes('TID') || hk === 'TERMINALID' || hk === 'OLDTERMINALID') {
+                    tids.add(v);
+                } else if (hk.includes('SERIAL') && !hk.includes('SIM') && !hk.includes('OLD')) {
+                    serials.add(v);
+                }
+            });
+            if (tids.size === 0 || serials.size === 0) {
+                keys.forEach(k => {
+                    const hk = hdrKey(k);
+                    const v = normDupId(row[k]);
+                    if (!v) return;
+                    if (tids.size === 0 && /^180\d{5}$/.test(v)) tids.add(v);
+                    if (serials.size === 0 && /^(800|8015)\d{5,}$/.test(v) &&
+                        !/SIM|MID|PHONE|CONTACT|NUMBER|NUM$/.test(hk)) serials.add(v);
+                });
+            }
+            return { tids, serials };
+        }
+
         function getTidFromRow(row) {
             return normKey(getCell(row, 'TID') || getCell(row, 'TERMINAL ID') || getCell(row, 'TID NO') || '');
         }
@@ -1521,18 +1552,13 @@
 
                 mergeHeadersFromRows(dailyRows);
 
-                const dailyTids = new Set();
-                const dailyOldTids = new Set();
+                const dailyTids = new Set();        // TID + OLD TID of the daily file
                 const dailyPosSerials = new Set();
 
                 const preparedDaily = dailyRows.map((dRow, i) => {
-                    const tid = normDupId(getTidFromRow(dRow));
-                    const oldTid = normDupId(getOldTidFromRow(dRow));
-                    const posSerial = normDupId(getPosSerialFromRow(dRow));
-
-                    if (tid) dailyTids.add(tid);
-                    if (oldTid) dailyOldTids.add(oldTid);
-                    if (posSerial) dailyPosSerials.add(posSerial);
+                    const ids = collectDupIds(dRow);
+                    ids.tids.forEach(v => dailyTids.add(v));
+                    ids.serials.forEach(v => dailyPosSerials.add(v));
 
                     const normalized = {};
                     activeHeaders.forEach(h => {
@@ -1546,20 +1572,14 @@
                 let movedToWithdrawn = 0;
 
                 liveRows.forEach(lRow => {
-                    const lTid = normDupId(getTidFromRow(lRow));
-                    const lOldTid = normDupId(getOldTidFromRow(lRow));
-                    const lPosSerial = normDupId(getPosSerialFromRow(lRow));
-
+                    const lIds = collectDupIds(lRow);
                     const matchedReasons = [];
-                    if (lTid && (dailyTids.has(lTid) || dailyOldTids.has(lTid))) {
-                        matchedReasons.push(`TID (${lTid})`);
-                    }
-                    if (lOldTid && (dailyTids.has(lOldTid) || dailyOldTids.has(lOldTid))) {
-                        matchedReasons.push(`OLD TID (${lOldTid})`);
-                    }
-                    if (lPosSerial && dailyPosSerials.has(lPosSerial)) {
-                        matchedReasons.push(`POS SERIAL (${lPosSerial})`);
-                    }
+                    lIds.tids.forEach(v => {
+                        if (dailyTids.has(v)) matchedReasons.push(`TID/OLD TID (${v})`);
+                    });
+                    lIds.serials.forEach(v => {
+                        if (dailyPosSerials.has(v)) matchedReasons.push(`POS SERIAL (${v})`);
+                    });
 
                     if (matchedReasons.length > 0) {
                         setCell(lRow, 'WITHDRAWN REPORT', `Duplicate ${matchedReasons.join(', ')} - Replaced by Daily Excel`);
