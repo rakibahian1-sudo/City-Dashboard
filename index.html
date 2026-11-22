@@ -659,7 +659,7 @@
                     <button onclick="exportBankMatched('csv')" id="exportBankCsvBtn" disabled
                         class="bg-teal-400/20 hover:bg-teal-400/30 disabled:opacity-40 text-teal-200 border border-teal-300/45 px-3.5 py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition">
                         <i class="fa-solid fa-file-csv"></i>
-                        <span>Export Matched CSV</span>
+                        <span>Export Matched XLSX</span>
                     </button>
 
                     <button onclick="exportBankMatched('xlsx')" id="exportBankXlsxBtn" disabled
@@ -2312,7 +2312,7 @@
             const ws = XLSX.utils.json_to_sheet(clean);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Bank_Matched_Live');
-            const fileName = `Bank_Matched_Live_TIDs.${ext}`;
+            const fileName = 'Bank_Matched_Live_TIDs.xlsx';   // always Excel (xlsx)
             XLSX.writeFile(wb, fileName);
             showToast(`Exported ${bankMatchedRows.length} matched rows (${fileName})`);
         }
@@ -2754,7 +2754,7 @@
         }
 
         function exportFilteredCSV() {
-            writeRowsToCSV(filteredRows, `${currentDataset}_Filtered_Export.csv`);
+            writeRowsToCSV(filteredRows, `${currentDataset}_Filtered_Export.xlsx`);
         }
 
         function exportSelectedCity() {
@@ -2765,10 +2765,10 @@
                 const label = cityArr.length === 1
                     ? cityArr[0].replace(/\s+/g, '_')
                     : `${cityArr.length}_Cities`;
-                writeRowsToCSV(rows, `City_${label}.csv`);
+                writeRowsToCSV(rows, `City_${label}.xlsx`);
                 return;
             }
-            writeRowsToCSV(source, `City_ALL_CITIES.csv`);
+            writeRowsToCSV(source, `City_ALL_CITIES.xlsx`);
         }
 
         function exportCurrentVersion() {
@@ -2776,7 +2776,7 @@
             const rows = selectedVersion === 'ALL'
                 ? source
                 : source.filter(r => (getCell(r, 'APP VERSION') || 'UNASSIGNED') === selectedVersion);
-            writeRowsToCSV(rows, `AppVersion_${selectedVersion.replace(/\s+/g, '_')}.csv`);
+            writeRowsToCSV(rows, `AppVersion_${selectedVersion.replace(/\s+/g, '_')}.xlsx`);
         }
 
         document.getElementById('sheetUrlInput').value = DEFAULT_APPS_SCRIPT_URL;
