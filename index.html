@@ -2621,7 +2621,9 @@
                     if (searchSpec.isMultiTid) {
                         const rowTid = getTidFromRow(r).toLowerCase();
                         const rowOldTid = getOldTidFromRow(r).toLowerCase();
-                        const matchesAnyTid = searchSpec.tokens.some(tok => rowTid === tok || rowOldTid === tok);
+                        // POS SERIAL (not OLD POS SERIAL) is searched too, so many serials can be pasted at once
+                        const rowPos = getCell(r, 'POS SERIAL').toLowerCase().replace(/[^0-9a-z]/g, '');
+                        const matchesAnyTid = searchSpec.tokens.some(tok => rowTid === tok || rowOldTid === tok || (rowPos !== '' && rowPos === tok));
                         if (!matchesAnyTid) return false;
                     } else {
                         const hit = activeHeaders.some(h => getCell(r, h).toLowerCase().includes(q));
