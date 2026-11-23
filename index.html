@@ -1125,21 +1125,18 @@
             return `${cleanBase},SPECIAL FUNCTIONALITY`;
         }
 
-        // Keeps what is already in LIVE and adds the new value(s) after it with a comma, no space (no repeats)
-        function mergeSpecialFunctionality(existing, incoming) {
-            const base = String(existing || '').trim();
-            const newParts = String(incoming || '')
-                .split(/[,;\n]+/)
-                .map(t => t.trim())
-                .filter(Boolean);
-            const toAdd = [];
-            newParts.forEach(part => {
-                const low = part.toLowerCase();
-                const already = base.toLowerCase().includes(low) || toAdd.some(t => t.toLowerCase() === low);
-                if (!already) toAdd.push(part);
-            });
-            if (toAdd.length === 0) return base;
-            return base ? `${base},${toAdd.join(',')}` : toAdd.join(',');
+        // Only when the Excel has Month 3-36 EMI numbers but no SPECIAL FUNCTIONALITY text:
+        // only the "ENABLE EMI FEATURE (...)" text inside LIVE is changed; everything else in LIVE stays exactly as it is.
+        function replaceEmiPartInSpecial(existing, emiText) {
+            const base = String(existing || '');
+            const emiRegex = /ENABLE EMI FEATURE\s*\([^)]*\)/i;
+            const m = base.match(emiRegex);
+            if (!m) {
+                return base.trim() ? `${emiText},${base.trim()}` : emiText;
+            }
+            const squash = t => t.replace(/\s+/g, '').toUpperCase();
+            if (squash(m[0]) === squash(emiText)) return base;   // same EMI text: nothing changes
+            return base.replace(emiRegex, emiText);
         }
 
         function detectEmiSpecialFunctionalityFromRow(rr) {
@@ -1842,11 +1839,15 @@
             ).trim();
 
             const emiTenureSpecialFunc = detectEmiSpecialFunctionalityFromRow(rr);
-            const incomingSpecialFunc = directSpecialFunc || emiTenureSpecialFunc;
-            // LIVE's existing SPECIAL FUNCTIONALITY stays; the new one from the Excel is added to it
-            const excelSpecialFunc = incomingSpecialFunc
-                ? mergeSpecialFunctionality(liveMatch ? getCell(liveMatch, 'SPECIAL FUNCTIONALITY') : '', incomingSpecialFunc)
-                : '';
+            // SPECIAL FUNCTIONALITY written in the Excel replaces the one in LIVE (same text = stays the same).
+            // Nothing in the Excel = LIVE stays as it is (value stays empty here, so nothing is changed or exported).
+            const liveSpecialNow = liveMatch ? getCell(liveMatch, 'SPECIAL FUNCTIONALITY') : '';
+            let excelSpecialFunc = '';
+            if (directSpecialFunc) {
+                excelSpecialFunc = directSpecialFunc;
+            } else if (emiTenureSpecialFunc) {
+                excelSpecialFunc = replaceEmiPartInSpecial(liveSpecialNow, emiTenureSpecialFunc);
+            }
 
             const liveExistingPurpose = liveMatch ? getCell(liveMatch, 'PURPOSE') : '';
             const excelPurpose = (getCell(rr, 'PURPOSE') || '').trim();
