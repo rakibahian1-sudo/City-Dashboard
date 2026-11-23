@@ -1125,6 +1125,23 @@
             return `${cleanBase},SPECIAL FUNCTIONALITY`;
         }
 
+        // Keeps what is already in LIVE and adds the new value(s) after it with a comma, no space (no repeats)
+        function mergeSpecialFunctionality(existing, incoming) {
+            const base = String(existing || '').trim();
+            const newParts = String(incoming || '')
+                .split(/[,;\n]+/)
+                .map(t => t.trim())
+                .filter(Boolean);
+            const toAdd = [];
+            newParts.forEach(part => {
+                const low = part.toLowerCase();
+                const already = base.toLowerCase().includes(low) || toAdd.some(t => t.toLowerCase() === low);
+                if (!already) toAdd.push(part);
+            });
+            if (toAdd.length === 0) return base;
+            return base ? `${base},${toAdd.join(',')}` : toAdd.join(',');
+        }
+
         function detectEmiSpecialFunctionalityFromRow(rr) {
             const activeTenures = [];
             EMI_TENURE_COLUMNS.forEach(({ col, tenure }) => {
@@ -1825,7 +1842,11 @@
             ).trim();
 
             const emiTenureSpecialFunc = detectEmiSpecialFunctionalityFromRow(rr);
-            const excelSpecialFunc = directSpecialFunc || emiTenureSpecialFunc;
+            const incomingSpecialFunc = directSpecialFunc || emiTenureSpecialFunc;
+            // LIVE's existing SPECIAL FUNCTIONALITY stays; the new one from the Excel is added to it
+            const excelSpecialFunc = incomingSpecialFunc
+                ? mergeSpecialFunctionality(liveMatch ? getCell(liveMatch, 'SPECIAL FUNCTIONALITY') : '', incomingSpecialFunc)
+                : '';
 
             const liveExistingPurpose = liveMatch ? getCell(liveMatch, 'PURPOSE') : '';
             const excelPurpose = (getCell(rr, 'PURPOSE') || '').trim();
