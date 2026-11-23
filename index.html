@@ -600,6 +600,10 @@
                             class="bg-elevated hover:bg-slate-800 text-teal-200 border border-teal-300/40 px-3 py-1.5 rounded-lg text-xs font-semibold transition">
                             <i class="fa-solid fa-plus mr-1"></i> Add TID Row
                         </button>
+                        <button onclick="exportRolloutPreviewSpecial()"
+                            class="bg-elevated hover:bg-slate-800 text-amber-200 border border-amber-300/40 px-3 py-1.5 rounded-lg text-xs font-semibold transition">
+                            <i class="fa-solid fa-file-excel mr-1"></i> Export Special Func (XLSX)
+                        </button>
                         <button onclick="clearRolloutPreview()"
                             class="bg-elevated hover:bg-slate-800 text-rose-300 border border-rose-400/35 px-3 py-1.5 rounded-lg text-xs font-semibold transition">
                             <i class="fa-solid fa-xmark mr-1"></i> Clear Preview
@@ -2083,6 +2087,55 @@
             } else {
                 showToast(`Found ${onlyMatchedInLive.length} matching LIVE TIDs out of ${rRows.length} rows (${lastSheetUnmatchedCount} unmatched skipped).`);
             }
+        }
+
+        // Exports the preview rows that have SPECIAL FUNCTIONALITY (typed in the sheet, or detected from the
+        // Month 3 / 6 / 9 / 12 / 18 / 24 / 30 / 36 EMI columns) as ready LIVE-format rows (.xlsx).
+        // The LIVE data itself is not changed - use "Upload to LIVE" for that.
+        function exportRolloutPreviewSpecial() {
+            const items = (rolloutPreviewRows || []).filter(it => String(it.specialFunctionality || '').trim() && it.tid);
+            if (items.length === 0) {
+                showToast('No SPECIAL FUNCTIONALITY / EMI month data found in the preview');
+                return;
+            }
+
+            const defaultEng = document.getElementById('rolloutPanelEngineerSelect').value;
+            const defaultDateIso = document.getElementById('rolloutPanelDatePicker').value;
+            const outRows = [];
+
+            items.forEach(it => {
+                const live = findLiveRowByStrictTid(String(it.tid).trim().toUpperCase());
+                if (!live) return;
+                const row = Object.assign({}, live);
+
+                const rowEng = (it.rollOutBy || '').trim() || defaultEng;
+                if (rowEng) setCell(row, 'ROLL OUT BY', rowEng);
+                const rollDate = (it.rollOutDate || '').trim() || formatChosenDate(defaultDateIso, getCell(live, 'CONFIG DATE'));
+                if (rollDate) setCell(row, 'ROLL OUT DATE', rollDate);
+                const appVer = (it.appVersion || '').trim() || activeAppVersion;
+                if (appVer) setCell(row, 'APP VERSION', appVer);
+
+                setCell(row, 'SPECIAL FUNCTIONALITY', String(it.specialFunctionality).trim());
+                const finalPurpose = (it.purpose || '').trim() || appendSpecialFunctionalityToPurpose(getCell(live, 'PURPOSE'));
+                setCell(row, 'PURPOSE', finalPurpose);
+                if ((it.qr || '').trim()) setCell(row, 'QR', it.qr.trim());
+                if ((it.limit || '').trim()) setCell(row, 'LIMIT', it.limit.trim());
+
+                const statusText = normalizeCaseText((it.status || '').trim());
+                if (statusText) addRemarkStatus(row, statusText);
+                if (statusText.toLowerCase() === 'done' || it.profileDone ||
+                    getCell(row, 'REMARKS (IF ANY)').trim().toLowerCase() === 'done') {
+                    setCell(row, PROFILE_HEADER, 'Done');
+                }
+                outRows.push(row);
+            });
+
+            if (outRows.length === 0) {
+                showToast('No matching LIVE rows to export');
+                return;
+            }
+            writeRowsToCSV(outRows, 'Special_Functionality_Ready_Live.xlsx');
+            showToast(`Exported ${outRows.length} ready LIVE row(s) with SPECIAL FUNCTIONALITY`);
         }
 
         async function applyQuickRolloutUpdate() {
