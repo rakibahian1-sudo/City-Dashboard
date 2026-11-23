@@ -638,6 +638,29 @@
                     </table>
                 </div>
             </div>
+
+            <!-- Excel TIDs that are not in LIVE: where are they? -->
+            <div id="rolloutUnmatchedBox" class="hidden bg-surface/90 border border-rose-400/35 rounded-xl p-3.5 space-y-2">
+                <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-rose-300">
+                    <i class="fa-solid fa-circle-question"></i>
+                    <span>Excel TIDs not found in LIVE - where are they?</span>
+                </div>
+                <p id="rolloutUnmatchedSummary" class="text-xs text-slate-300"></p>
+                <div class="overflow-x-auto max-h-64 rounded-lg border border-line">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead class="bg-elevated text-rose-200 uppercase text-[10px] tracking-wider sticky top-0 z-10">
+                            <tr>
+                                <th class="py-2 px-2.5 border-b border-line">TID</th>
+                                <th class="py-2 px-2.5 border-b border-line">WHERE</th>
+                                <th class="py-2 px-2.5 border-b border-line">MERCHANT</th>
+                                <th class="py-2 px-2.5 border-b border-line">CITY</th>
+                                <th class="py-2 px-2.5 border-b border-line">DETAILS / WITHDRAWN REPORT</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rolloutUnmatchedTbody" class="divide-y divide-line/60 bg-obsidian/70"></tbody>
+                    </table>
+                </div>
+            </div>
         </section>
 
         <!-- BANK MAIL EXCEL -> LIVE TID MATCH & EXPORT -->
@@ -2052,7 +2075,64 @@
             renderRolloutPreviewTable();
         }
 
+        let rolloutUnmatchedInfo = [];
+
+        // Where is an Excel TID that is not in LIVE? (WITHDRAWN, as an OLD TID, or nowhere)
+        function lookupUnmatchedTid(tid) {
+            const t = String(tid || '').trim().toUpperCase();
+            const merchantOf = r => getCell(r, 'MERCHANT NAME') || getCell(r, 'DBA NAME') || '-';
+            const wd = withdrawnRows.find(r => getTidFromRow(r) === t);
+            if (wd) {
+                return { where: 'WITHDRAWN', merchant: merchantOf(wd), city: getCell(wd, 'CITY') || '-',
+                         details: getCell(wd, 'WITHDRAWN REPORT') || 'Found in WITHDRAWN list' };
+            }
+            const liveOld = liveRows.find(r => getOldTidFromRow(r) === t);
+            if (liveOld) {
+                return { where: 'LIVE (OLD TID)', merchant: merchantOf(liveOld), city: getCell(liveOld, 'CITY') || '-',
+                         details: `This is the OLD TID. Now TID ${getTidFromRow(liveOld)} in LIVE` };
+            }
+            const wdOld = withdrawnRows.find(r => getOldTidFromRow(r) === t);
+            if (wdOld) {
+                const rep = getCell(wdOld, 'WITHDRAWN REPORT');
+                return { where: 'WITHDRAWN (OLD TID)', merchant: merchantOf(wdOld), city: getCell(wdOld, 'CITY') || '-',
+                         details: `This is the OLD TID of ${getTidFromRow(wdOld)} in WITHDRAWN${rep ? ' - ' + rep : ''}` };
+            }
+            return { where: 'NOT FOUND', merchant: '-', city: '-', details: 'Not in LIVE and not in WITHDRAWN' };
+        }
+
+        function renderRolloutUnmatched() {
+            const box = document.getElementById('rolloutUnmatchedBox');
+            const tbody = document.getElementById('rolloutUnmatchedTbody');
+            const summary = document.getElementById('rolloutUnmatchedSummary');
+            if (!box || !tbody || !summary) return;
+            if (!rolloutUnmatchedInfo || rolloutUnmatchedInfo.length === 0) {
+                box.classList.add('hidden');
+                tbody.innerHTML = '';
+                return;
+            }
+            box.classList.remove('hidden');
+            const count = w => rolloutUnmatchedInfo.filter(i => i.where.startsWith(w)).length;
+            summary.innerHTML =
+                `<strong class="text-white">${rolloutUnmatchedInfo.length}</strong> Excel TID(s) are not in LIVE: ` +
+                `<strong class="text-rose-300">${count('WITHDRAWN')}</strong> in WITHDRAWN • ` +
+                `<strong class="text-amber-300">${count('LIVE')}</strong> are an OLD TID in LIVE • ` +
+                `<strong class="text-slate-200">${count('NOT FOUND')}</strong> not found anywhere`;
+            tbody.innerHTML = rolloutUnmatchedInfo.map(i => {
+                const color = i.where.startsWith('WITHDRAWN') ? 'text-rose-300'
+                    : (i.where.startsWith('LIVE') ? 'text-amber-300' : 'text-slate-300');
+                return `<tr>
+                    <td class="py-2 px-2.5 text-slate-100 whitespace-nowrap font-mono">${escHtml(i.tid)}</td>
+                    <td class="py-2 px-2.5 font-bold whitespace-nowrap ${color}">${escHtml(i.where)}</td>
+                    <td class="py-2 px-2.5 text-slate-100 whitespace-nowrap">${escHtml(i.merchant)}</td>
+                    <td class="py-2 px-2.5 text-slate-100 whitespace-nowrap">${escHtml(i.city)}</td>
+                    <td class="py-2 px-2.5 text-slate-300">${escHtml(i.details)}</td>
+                </tr>`;
+            }).join('');
+        }
+
         function clearRolloutPreview() {
+            rolloutUnmatchedInfo = [];
+            renderRolloutUnmatched();
             rolloutPreviewRows = [];
             lastSheetTotalRows = 0;
             lastSheetUnmatchedCount = 0;
@@ -2087,6 +2167,16 @@
 
             const allBuilt = rRows.map(rr => buildPreviewRowFromExcel(rr, activeEngInitial, activeIsoInitial));
             const onlyMatchedInLive = allBuilt.filter(item => item.tid && item.matched);
+
+            // Excel TIDs that are not in LIVE: tell where they are (WITHDRAWN or not)
+            const unmatchedMap = new Map();
+            allBuilt.forEach(item => {
+                if (item.tid && !item.matched && !unmatchedMap.has(item.tid)) {
+                    unmatchedMap.set(item.tid, Object.assign({ tid: item.tid }, lookupUnmatchedTid(item.tid)));
+                }
+            });
+            rolloutUnmatchedInfo = Array.from(unmatchedMap.values());
+            renderRolloutUnmatched();
 
             lastSheetTotalRows = rRows.length;
             lastSheetUnmatchedCount = Math.max(0, rRows.length - onlyMatchedInLive.length);
@@ -2301,6 +2391,8 @@
             }
 
             rolloutPreviewRows = [];
+            rolloutUnmatchedInfo = [];
+            renderRolloutUnmatched();
             lastSheetTotalRows = 0;
             lastSheetUnmatchedCount = 0;
             isSheetRolloutMode = false;
