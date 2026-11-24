@@ -602,7 +602,7 @@
                         </button>
                         <button onclick="exportRolloutPreviewSpecial()"
                             class="bg-elevated hover:bg-slate-800 text-amber-200 border border-amber-300/40 px-3 py-1.5 rounded-lg text-xs font-semibold transition">
-                            <i class="fa-solid fa-file-excel mr-1"></i> Export Special Func (XLSX)
+                            <i class="fa-solid fa-file-excel mr-1"></i> Export Preview (XLSX)
                         </button>
                         <button onclick="clearRolloutPreview()"
                             class="bg-elevated hover:bg-slate-800 text-rose-300 border border-rose-400/35 px-3 py-1.5 rounded-lg text-xs font-semibold transition">
@@ -2219,13 +2219,13 @@
             }
         }
 
-        // Exports the preview rows that have SPECIAL FUNCTIONALITY (typed in the sheet, or detected from the
-        // Month 3 / 6 / 9 / 12 / 18 / 24 / 30 / 36 EMI columns) as ready LIVE-format rows (.xlsx).
+        // Exports ALL preview rows as ready LIVE-format rows (.xlsx), with the SPECIAL FUNCTIONALITY (typed in the
+        // sheet, or detected from the Month 3 / 6 / 9 / 12 / 18 / 24 / 30 / 36 EMI columns) and status applied.
         // The LIVE data itself is not changed - use "Upload to LIVE" for that.
         function exportRolloutPreviewSpecial() {
-            const items = (rolloutPreviewRows || []).filter(it => String(it.specialFunctionality || '').trim() && it.tid);
+            const items = (rolloutPreviewRows || []).filter(it => it.tid);
             if (items.length === 0) {
-                showToast('No SPECIAL FUNCTIONALITY / EMI month data found in the preview');
+                showToast('Nothing to export - the preview is empty');
                 return;
             }
 
@@ -2245,9 +2245,13 @@
                 const appVer = (it.appVersion || '').trim() || activeAppVersion;
                 if (appVer) setCell(row, 'APP VERSION', appVer);
 
-                setCell(row, 'SPECIAL FUNCTIONALITY', String(it.specialFunctionality).trim());
-                const finalPurpose = (it.purpose || '').trim() || appendSpecialFunctionalityToPurpose(getCell(live, 'PURPOSE'));
-                setCell(row, 'PURPOSE', finalPurpose);
+                if (String(it.specialFunctionality || '').trim()) {
+                    setCell(row, 'SPECIAL FUNCTIONALITY', String(it.specialFunctionality).trim());
+                    const finalPurpose = (it.purpose || '').trim() || appendSpecialFunctionalityToPurpose(getCell(live, 'PURPOSE'));
+                    setCell(row, 'PURPOSE', finalPurpose);
+                } else if ((it.purpose || '').trim()) {
+                    setCell(row, 'PURPOSE', it.purpose.trim());
+                }
                 if ((it.qr || '').trim()) setCell(row, 'QR', it.qr.trim());
                 if ((it.limit || '').trim()) setCell(row, 'LIMIT', it.limit.trim());
 
@@ -2264,8 +2268,8 @@
                 showToast('No matching LIVE rows to export');
                 return;
             }
-            writeRowsToCSV(outRows, 'Special_Functionality_Ready_Live.xlsx');
-            showToast(`Exported ${outRows.length} ready LIVE row(s) with SPECIAL FUNCTIONALITY`);
+            writeRowsToCSV(outRows, 'Rollout_Preview_Ready_Live.xlsx');
+            showToast(`Exported ${outRows.length} of ${items.length} preview row(s) as ready LIVE rows`);
         }
 
         async function applyQuickRolloutUpdate() {
