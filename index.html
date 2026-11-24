@@ -2230,7 +2230,7 @@
             }
 
             // Export = LIVE terminal exactly as it is now. Only what the Excel really contains is changed
-            // (nothing is auto-filled from the Engineer / Date boxes). Last column "UPDATED FIELDS" shows what changed.
+            // (nothing is auto-filled from the Engineer / Date boxes).
             const outRows = [];
             let changedRows = 0;
 
@@ -2288,14 +2288,13 @@
             const clean = outRows.map(o => {
                 const obj = {};
                 activeHeaders.forEach(h => { obj[h.trim()] = getCell(o.row, h); });
-                obj['UPDATED FIELDS'] = o.changed.join(', ');
                 return obj;
             });
             const ws = XLSX.utils.json_to_sheet(clean);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Export');
             XLSX.writeFile(wb, 'Rollout_Preview_Ready_Live.xlsx');
-            showToast(`Exported ${outRows.length} of ${items.length} row(s) - ${changedRows} row(s) have updates (see UPDATED FIELDS column)`);
+            showToast(`Exported ${outRows.length} of ${items.length} row(s) - ${changedRows} row(s) have updates`);
         }
 
         async function applyQuickRolloutUpdate() {
