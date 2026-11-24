@@ -646,6 +646,10 @@
                     <span>Excel TIDs not found in LIVE - where are they?</span>
                 </div>
                 <p id="rolloutUnmatchedSummary" class="text-xs text-slate-300"></p>
+                <button id="copyWithdrawnTidsBtn" onclick="copyWithdrawnTidsFromUnmatched()"
+                    class="bg-rose-400/15 hover:bg-rose-400/25 text-rose-200 border border-rose-300/40 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition">
+                    <i class="fa-solid fa-copy mr-1"></i> <span id="copyWithdrawnTidsLabel">Copy Withdrawn TIDs</span>
+                </button>
                 <div class="overflow-x-auto max-h-64 rounded-lg border border-line">
                     <table class="w-full text-left border-collapse text-xs">
                         <thead class="bg-elevated text-rose-200 uppercase text-[10px] tracking-wider sticky top-0 z-10">
@@ -2100,6 +2104,18 @@
             return { where: 'NOT FOUND', merchant: '-', city: '-', details: 'Not in LIVE and not in WITHDRAWN' };
         }
 
+        // Copies every Excel TID that is in WITHDRAWN (one TID per line) so it can be pasted anywhere
+        function copyWithdrawnTidsFromUnmatched() {
+            const tids = (rolloutUnmatchedInfo || [])
+                .filter(i => i.where.startsWith('WITHDRAWN'))
+                .map(i => i.tid);
+            if (tids.length === 0) {
+                showToast('No withdrawn TIDs to copy');
+                return;
+            }
+            copyText(tids.join('\n'), `${tids.length} withdrawn TID(s) copied`);
+        }
+
         function renderRolloutUnmatched() {
             const box = document.getElementById('rolloutUnmatchedBox');
             const tbody = document.getElementById('rolloutUnmatchedTbody');
@@ -2112,6 +2128,8 @@
             }
             box.classList.remove('hidden');
             const count = w => rolloutUnmatchedInfo.filter(i => i.where.startsWith(w)).length;
+            const wdLabel = document.getElementById('copyWithdrawnTidsLabel');
+            if (wdLabel) wdLabel.textContent = `Copy Withdrawn TIDs (${count('WITHDRAWN')})`;
             summary.innerHTML =
                 `<strong class="text-white">${rolloutUnmatchedInfo.length}</strong> Excel TID(s) are not in LIVE: ` +
                 `<strong class="text-rose-300">${count('WITHDRAWN')}</strong> in WITHDRAWN • ` +
