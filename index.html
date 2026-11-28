@@ -1870,7 +1870,10 @@
             // Nothing in the Excel = LIVE stays as it is (value stays empty here, so nothing is changed or exported).
             const liveSpecialNow = liveMatch ? getCell(liveMatch, 'SPECIAL FUNCTIONALITY') : '';
             let excelSpecialFunc = '';
-            if (directSpecialFunc) {
+            if (directSpecialFunc && emiTenureSpecialFunc) {
+                // Excel has SPECIAL FUNCTIONALITY text AND Month 3-36 numbers: the EMI text from the Month columns is added to it
+                excelSpecialFunc = replaceEmiPartInSpecial(directSpecialFunc, emiTenureSpecialFunc);
+            } else if (directSpecialFunc) {
                 excelSpecialFunc = directSpecialFunc;
             } else if (emiTenureSpecialFunc) {
                 excelSpecialFunc = replaceEmiPartInSpecial(liveSpecialNow, emiTenureSpecialFunc);
